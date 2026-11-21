@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T13:40:00Z",
+  "title": "Design System: checkberry",
+  "extensions": {
+    "colorMeta": {
+      "blueberry": { "role": "primary", "displayName": "Blueberry", "canonical": "#4A55C9" },
+      "honey": { "role": "secondary", "displayName": "Honey (streak)", "canonical": "#9A6100" },
+      "danger": { "role": "secondary", "displayName": "Overdue red", "canonical": "#D2343C" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#FFFFFF" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1C1D21" },
+      "field": { "role": "neutral", "displayName": "Field", "canonical": "#F3F4F6" },
+      "rule": { "role": "neutral", "displayName": "Hairline", "canonical": "#E6E8EC" }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Screen title", "purpose": "LargeTitle, one per screen." },
+      "section": { "displayName": "Section", "purpose": "ListHeader above a hairline." },
+      "row": { "displayName": "Row", "purpose": "Task and habit titles." },
+      "meta": { "displayName": "Meta", "purpose": "Dates, streaks, counts." }
+    },
+    "shadows": [{ "name": "segment-thumb", "value": "0 1px 3px rgba(0,0,0,0.08)", "purpose": "Selected segment only." }],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.33, 1, 0.68, 1)", "purpose": "Easing.out(cubic), every transition." },
+      { "name": "fill", "value": "160ms", "purpose": "Check box and habit chip fill, greeting fade." },
+      { "name": "panel", "value": "250ms", "purpose": "Calendar fold and day panel, ring check draw." },
+      { "name": "ring", "value": "400ms", "purpose": "Progress ring sweep." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Check box",
+      "kind": "custom",
+      "refersTo": "check-box",
+      "description": "20pt rounded square; fills blueberry, then the tick draws.",
+      "html": "<span class=\"ds-check\"></span><span class=\"ds-check ds-check-on\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\"><path d=\"M5.5 10.5 L8.7 13.7 L14.5 7\" stroke=\"#fff\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span>",
+      "css": ".ds-check { display:inline-flex; width:20px; height:20px; border-radius:6px; border:1.5px solid #C9CCD3; margin-right:12px; box-sizing:border-box; transition: background .16s, border-color .16s; } .ds-check-on { background:#4A55C9; border-color:#4A55C9; } .ds-check:active { transform: scale(.92); }"
+    },
+    {
+      "name": "Habit chip",
+      "kind": "chip",
+      "refersTo": "habit-chip",
+      "description": "Round chip at 14% tone; fills with the tone when the habit is done.",
+      "html": "<span class=\"ds-habit\"></span><span class=\"ds-habit ds-habit-on\"></span>",
+      "css": ".ds-habit { display:inline-block; width:34px; height:34px; border-radius:50%; background:#3E8A9324; margin-right:12px; transition: background .16s; } .ds-habit-on { background:#3E8A93; }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "36pt pill; field when off, ink when selected.",
+      "html": "<button class=\"ds-chip\">매일</button><button class=\"ds-chip ds-chip-on\">요일 지정</button>",
+      "css": ".ds-chip { height:36px; padding:0 16px; border-radius:999px; border:none; background:#F3F4F6; color:#1C1D21; font: 500 15px SUIT, sans-serif; margin-right:8px; } .ds-chip-on { background:#1C1D21; color:#fff; } .ds-chip:focus-visible { outline:2px solid #4A55C9; outline-offset:2px; }"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "50pt blueberry button for the one main action.",
+      "html": "<button class=\"ds-btn\">시작하기</button>",
+      "css": ".ds-btn { height:50px; padding:0 20px; border-radius:14px; border:none; background:#4A55C9; color:#fff; font: 600 17px SUIT, sans-serif; } .ds-btn:active { opacity:.7; } .ds-btn:focus-visible { outline:2px solid #1C1D21; outline-offset:2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "하루를 정리한 종이 한 장",
+    "overview": "흰 종이 위 글자와 머리카락 선만으로 구조를 세운다. 카드·그림자·색 면이 없고, 색은 체크 상자와 습관 칩이 완료될 때만 들어온다.",
+    "keyCharacteristics": [
+      "Hairline-separated lists, no cards",
+      "One blueberry accent",
+      "Six muted habit tones",
+      "SUIT type",
+      "SF Symbols",
+      "160/250/400ms ease-out motion"
+    ],
+    "rules": [
+      {
+        "name": "Color only on completion",
+        "body": "Large color areas appear only when a check box or habit chip is done.",
+        "section": "colors"
+      }
+    ],
+    "dos": ["Do separate groups with section headers and hairlines.", "Do add icons as SF Symbols in ICONS."],
+    "donts": ["Don't bring back cards, shadow boxes, filled summary panels, or confetti.", "Don't use blueberry for decoration."]
+  }
+}

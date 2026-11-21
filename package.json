@@ -1,22 +1,84 @@
 {
   "name": "checkberry",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@react-native-community/datetimepicker": "9.2.1",
+    "clsx": "^2.1.1",
     "expo": "~58.0.26",
+    "expo-blur": "~58.0.6",
+    "expo-constants": "~58.0.16",
+    "expo-crypto": "~58.0.8",
+    "expo-document-picker": "~58.0.5",
+    "expo-file-system": "~58.0.14",
+    "expo-haptics": "~58.0.8",
+    "expo-linking": "~58.0.17",
+    "expo-router": "~58.0.32",
+    "expo-sharing": "~58.0.23",
+    "expo-splash-screen": "~58.0.14",
+    "expo-sqlite": "~58.0.18",
     "expo-status-bar": "~58.0.5",
+    "expo-system-ui": "~58.0.7",
+    "heroui-native": "^1.1.1",
+    "papaparse": "^5.7.1",
     "react": "19.3.0",
-    "react-native": "0.88.1"
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-keyboard-controller": "1.22.7",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1",
+    "react-native-svg": "15.16.0",
+    "react-native-worklets": "0.13.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwind-variants": "^3.3.1",
+    "uniwind": "^1.14.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@feature-sliced/steiger-plugin": "^0.8.2",
+    "@types/jest": "30.0.0",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "~19.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
+    "husky": "^9.1.7",
+    "jest": "~30.5.2",
+    "jest-expo": "~58.0.15",
+    "knip": "^6.46.1",
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "steiger": "^0.10.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "format": "prettier --write .",
+    "arch": "steiger ./src",
+    "verify": "expo lint && prettier --check . && steiger ./src && knip",
+    "prepare": "husky",
+    "knip": "knip",
+    "knip:fix": "knip --fix"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "setupFiles": [
+      "./jest.setup.js"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|uniwind))",
+      "/node_modules/react-native-reanimated/plugin/",
+      "/node_modules/@react-native/babel-preset/"
+    ]
+  },
+  "packageManager": "pnpm@10.31.0"
 }

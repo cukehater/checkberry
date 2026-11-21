@@ -23,6 +23,10 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
+## Architecture
+
+Read `ARCHITECTURE.md` before changing anything in `src/`. It defines the FSD layer rules, where new code goes, UI/data conventions, and the `pnpm verify` harness that runs on every commit.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

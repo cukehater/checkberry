@@ -1,0 +1,179 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import 'heroui-native/styles';
+
+@source './node_modules/heroui-native/lib';
+
+/*
+checkberry 디자인 키트 테마. HeroUI Native 테마 변수를 덮어쓴다. 크림 바닥(background) 위 흰 면(surface),
+포인트는 베리 빨강(accent) 하나, 진행은 잎 초록(success). 라이트·다크는 기기 설정을 따른다.
+className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 값을 쓴다. 색을 바꾸면 둘과 app.json 스플래시 색을 같이 고친다.
+글꼴은 시스템 글꼴(iOS: SF Pro + Apple SD Gothic Neo)이고 fontFamily를 지정하지 않는다.
+*/
+/* ── 1. HeroUI 테마 변수 덮어쓰기 ───────────────────────────── */
+@layer theme {
+  :root {
+    @variant light {
+      --background: #fdf8ec; /* 크림 */
+      --foreground: #1f1a17;
+
+      --surface: #ffffff;
+      --surface-foreground: #1f1a17;
+      --surface-secondary: #f8f3ea; /* 습관 타일, 입력 바탕 */
+      --surface-tertiary: #f2ece1;
+      --overlay: #ffffff;
+      --overlay-foreground: #1f1a17;
+      --backdrop: rgba(31, 26, 23, 0.25);
+
+      --muted: #6f675f; /* bg 위 5.24:1 */
+      --default: #eee7da; /* 보조 버튼, 탭 트랙 */
+      --default-foreground: #1f1a17;
+
+      --accent: #e11d48; /* 베리 빨강 · 흰 글자 4.70:1 */
+      --accent-foreground: #ffffff;
+
+      --field-background: #ffffff;
+      --field-foreground: #1f1a17;
+      --field-placeholder: #6f675f;
+
+      --success: #5ea61c; /* 잎 초록 */
+      --success-foreground: #1f1a17;
+      --warning: #f5a524;
+      --warning-foreground: #1f1a17;
+      --danger: #c2410c; /* 벽돌색 · 흰 글자 5.18:1 */
+      --danger-foreground: #ffffff;
+
+      --segment: #ffffff;
+      --segment-foreground: #1f1a17;
+      --border: #e8e0d2;
+      --separator: #efe8dc;
+      --focus: #e11d48;
+
+      --surface-shadow: 0 2px 4px 0 rgba(60, 40, 20, 0.04), 0 1px 2px 0 rgba(60, 40, 20, 0.06), 0 0 1px 0 rgba(60, 40, 20, 0.08);
+      --overlay-shadow: 0 2px 8px 0 rgba(60, 40, 20, 0.04), 0 14px 28px 0 rgba(60, 40, 20, 0.1), 0 0 0 1px rgba(60, 40, 20, 0.05);
+      --field-shadow: 0 2px 4px 0 rgba(60, 40, 20, 0.04), 0 1px 2px 0 rgba(60, 40, 20, 0.06), 0 0 1px 0 rgba(60, 40, 20, 0.08);
+
+      /* checkberry 전용: soft 바탕과 그 위 글자색 (HeroUI 계산값 대신 고정값) */
+      --cb-accent-tint: #ffe4e9;
+      --cb-accent-ink: #b4123a; /* 5.68:1 */
+      --cb-success-tint: #edf6e1;
+      --cb-success-ink: #3d7311; /* 5.16:1 */
+      --cb-warning-tint: #fff1dc;
+      --cb-warning-ink: #8a5e1f; /* 5.10:1 */
+      --cb-danger-tint: #fdebdf;
+      --cb-danger-ink: #b23a0b; /* 5.17:1 */
+      --cb-track: #d9cfbf; /* 꺼진 스위치, 빈 마디 테두리 */
+    }
+
+    @variant dark {
+      --background: #120e0d;
+      --foreground: #fbf6ee;
+
+      --surface: #1d1917;
+      --surface-foreground: #fbf6ee;
+      --surface-secondary: #27221f;
+      --surface-tertiary: #2b2522;
+      --overlay: #1d1917;
+      --overlay-foreground: #fbf6ee;
+      --backdrop: rgba(0, 0, 0, 0.5);
+
+      --muted: #a8a099; /* bg 위 7.45:1 */
+      --default: #2e2825;
+      --default-foreground: #fbf6ee;
+
+      --accent: #e11d48;
+      --accent-foreground: #ffffff;
+
+      --field-background: #1d1917;
+      --field-foreground: #fbf6ee;
+      --field-placeholder: #a8a099;
+
+      --success: #6dbe2a;
+      --success-foreground: #120e0d;
+      --warning: #f7b750;
+      --warning-foreground: #120e0d;
+      --danger: #c8401a; /* 흰 글자 5.00:1 */
+      --danger-foreground: #ffffff;
+
+      --segment: #4a423d;
+      --segment-foreground: #fbf6ee;
+      --border: #332c28;
+      --separator: #2f2925;
+      --focus: #e11d48;
+
+      --surface-shadow: 0 0 0 0 transparent;
+      --overlay-shadow: 0 0 0 1px rgba(255, 240, 230, 0.08), 0 16px 32px 0 rgba(0, 0, 0, 0.5);
+      --field-shadow: 0 0 0 0 transparent;
+
+      --cb-accent-tint: #3b1520;
+      --cb-accent-ink: #ff8fa6; /* 7.41:1 */
+      --cb-success-tint: #1f2c14;
+      --cb-success-ink: #a6db74; /* 9.10:1 */
+      --cb-warning-tint: #342b1e;
+      --cb-warning-ink: #fad094; /* 9.61:1 */
+      --cb-danger-tint: #3a1d12;
+      --cb-danger-ink: #f59a70; /* 7.14:1 */
+      --cb-track: #544a43;
+    }
+  }
+}
+
+/* ── 2. soft 색을 고정값으로, 전용 색을 Tailwind 클래스로 ─────── */
+@theme inline {
+  --color-accent-soft: var(--cb-accent-tint);
+  --color-accent-soft-foreground: var(--cb-accent-ink);
+  --color-success-soft: var(--cb-success-tint);
+  --color-success-soft-foreground: var(--cb-success-ink);
+  --color-warning-soft: var(--cb-warning-tint);
+  --color-warning-soft-foreground: var(--cb-warning-ink);
+  --color-danger-soft: var(--cb-danger-tint);
+  --color-danger-soft-foreground: var(--cb-danger-ink);
+  --color-track: var(--cb-track); /* bg-track, border-track */
+}
+
+/* ── 3. 글자 단계 (시스템 글꼴, fontFamily 지정 없음) ──────────── */
+@theme {
+  --text-display: 34px;
+  --text-display--line-height: 40px;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.8px;
+
+  --text-title: 28px;
+  --text-title--line-height: 34px;
+  --text-title--font-weight: 700;
+  --text-title--letter-spacing: -0.6px;
+
+  --text-heading: 20px;
+  --text-heading--line-height: 28px;
+  --text-heading--font-weight: 600;
+
+  --text-section: 18px;
+  --text-section--line-height: 24px;
+  --text-section--font-weight: 600;
+
+  --text-body-strong: 16px;
+  --text-body-strong--line-height: 22px;
+  --text-body-strong--font-weight: 500;
+
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+
+  --text-meta: 14px;
+  --text-meta--line-height: 20px;
+  --text-meta--font-weight: 500;
+
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+
+  --text-tab: 11px;
+  --text-tab--line-height: 13px;
+  --text-tab--font-weight: 600;
+}
+
+/* 프로젝트 전용 별칭: 목록 카드(card), 다이얼로그 면(elevated), 탭 바(bar) */
+@theme inline {
+  --color-card: var(--surface);
+  --color-elevated: var(--overlay);
+  --color-bar: var(--surface);
+}
