@@ -164,7 +164,7 @@ export function TasksPage() {
             chips={
               remaining > 0 && (
                 <>
-                  <Lozenge size="lg" label={`남은 ${remaining}`} />
+                  <Lozenge size="lg" label={`남은 할 일 ${remaining}개`} />
                   {overdueCount > 0 && <Lozenge size="lg" tone="danger" label={`지연 ${overdueCount}`} />}
                 </>
               )

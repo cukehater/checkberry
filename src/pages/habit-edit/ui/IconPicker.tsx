@@ -5,7 +5,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { setSetting, useQuery } from '@/shared/db';
 import { cn } from '@/shared/lib';
 import { habitIconName, ICON_PREFIX } from '@/entities/habit';
-import { allPhosphorIcons, IconButton, PhosphorIcon, SearchField, Text, useCardStyle, useColor } from '@/shared/ui';
+import { allPhosphorTags, IconButton, PhosphorIcon, SearchField, Text, useCardStyle, useColor } from '@/shared/ui';
 
 // 검색어가 없을 때 맨 앞에 두는 습관 아이콘. 그 뒤로 나머지 전체가 이어진다
 const SUGGESTED = [
@@ -153,7 +153,7 @@ export function IconPicker({
   const [query, setQuery] = useState('');
   const recentRow = useQuery<{ value: string | null }>("SELECT value FROM settings WHERE key = 'recentIcons'");
   // 전체 데이터는 시트를 처음 열 때 읽는다
-  const tags = useMemo(() => (visible ? allPhosphorIcons().PHOSPHOR_TAGS : {}), [visible]);
+  const tags = useMemo(() => (visible ? allPhosphorTags() : {}), [visible]);
   const names = useMemo(() => Object.keys(tags), [tags]);
   const recent = useMemo(() => {
     try {

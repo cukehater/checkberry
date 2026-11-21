@@ -23,8 +23,20 @@ function fromUtc(ms: number): DateStr {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
+// 연속 기록·달성률 계산은 렌더마다 같은 날짜로 addDays·weekday를 수천 번 부른다(문자열 파싱 + Date 생성).
+// 결과를 문자열 키로 캐시한다. 크기가 넘치면 비운다(날짜는 날마다 조금씩만 바뀌어 다시 금방 찬다)
+const CACHE_MAX = 50000;
+const addCache = new Map<string, DateStr>();
+const weekdayCache = new Map<DateStr, number>();
+
 export function addDays(date: DateStr, n: number): DateStr {
-  return fromUtc(utc(date) + n * 86400000);
+  const key = `${date}|${n}`;
+  let v = addCache.get(key);
+  if (v === undefined) {
+    if (addCache.size >= CACHE_MAX) addCache.clear();
+    addCache.set(key, (v = fromUtc(utc(date) + n * 86400000)));
+  }
+  return v;
 }
 
 /** b - a (일) */
@@ -34,7 +46,12 @@ export function diffDays(a: DateStr, b: DateStr): number {
 
 /** 0=일 ~ 6=토 */
 export function weekday(date: DateStr): number {
-  return new Date(utc(date)).getUTCDay();
+  let v = weekdayCache.get(date);
+  if (v === undefined) {
+    if (weekdayCache.size >= CACHE_MAX) weekdayCache.clear();
+    weekdayCache.set(date, (v = new Date(utc(date)).getUTCDay()));
+  }
+  return v;
 }
 
 /** 그 날짜가 속한 주의 일요일 */

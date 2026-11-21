@@ -1,4 +1,5 @@
-// @phosphor-icons/core의 fill SVG 경로와 검색 태그를 뽑아 src/shared/ui/phosphor-icons.all.ts를 만든다. `pnpm icons:gen`
+// @phosphor-icons/core의 fill SVG 경로(phosphor-icons.all.ts)와 검색 태그(phosphor-tags.ts)를 뽑는다. `pnpm icons:gen`
+// 태그는 아이콘 피커만 쓰므로 따로 둬서 습관 아이콘을 그릴 때 평가하지 않게 한다
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,7 @@ const root = dirname(dirname(require.resolve('@phosphor-icons/core')));
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const { icons: meta } = require('@phosphor-icons/core');
 const out = new URL('../src/shared/ui/phosphor-icons.all.ts', import.meta.url);
+const tagsOut = new URL('../src/shared/ui/phosphor-tags.ts', import.meta.url);
 
 const paths = {};
 const tags = {};
@@ -29,6 +31,12 @@ writeFileSync(
 
 /** 아이콘 이름 → path d(경로가 여럿이면 배열) */
 export const PHOSPHOR_PATHS: Record<string, string | readonly string[]> = ${JSON.stringify(paths)};
+`,
+);
+writeFileSync(
+  tagsOut,
+  `// 생성 파일. 직접 고치지 않는다(scripts/gen-phosphor-icons.mjs, \`pnpm icons:gen\`).
+// Phosphor Icons (MIT) · @phosphor-icons/core ${version} 검색 태그.
 
 /** 아이콘 이름 → 검색 태그(영문, 공백 구분) */
 export const PHOSPHOR_TAGS: Record<string, string> = ${JSON.stringify(tags)};

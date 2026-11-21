@@ -7,3 +7,4 @@ src/uniwind-types.d.ts
 design/
 # 생성 파일(scripts/gen-phosphor-icons.mjs). 한 줄 JSON으로 둔다
 src/shared/ui/phosphor-icons.all.ts
+src/shared/ui/phosphor-tags.ts

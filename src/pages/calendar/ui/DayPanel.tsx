@@ -113,24 +113,21 @@ export function DayPanel({
                   <Text className="text-[13px] font-semibold">습관 {tally.total}개 예정</Text>
                 </View>
               ) : (
-                // 지난 날·오늘: '습관 ●●○○ 2/4'. 점은 5개까지
+                // 지난 날·오늘: 습관마다 점 하나(●●○○). 점은 5개까지, '습관'·개수는 읽기 라벨에만
                 <View
                   accessible
                   accessibilityLabel={`습관 ${tally.total}개 중 ${tally.done}개 완료`}
                   className="h-[26px] flex-row items-center gap-1.5 rounded-full bg-default px-2.5"
                 >
-                  <Text className="text-[13px] font-semibold">습관</Text>
                   <View className="flex-row gap-[3px]">
                     {[...counted]
                       .sort((a, b) => Number(b.doneToday) - Number(a.doneToday))
                       .slice(0, MAX_DOTS)
                       .map((d, i) => (
-                        <View key={i} className={cn('h-2 w-2 rounded-full', d.doneToday ? 'bg-accent' : 'bg-accent-soft')} />
+                        // 한 것은 호박, 안 한 것은 흐린 호박(35%). 옅은 호박 면은 다크의 회색 칩에 묻힌다
+                        <View key={i} className={cn('h-2 w-2 rounded-full', d.doneToday ? 'bg-warning' : 'bg-warning opacity-35')} />
                       ))}
                   </View>
-                  <Text className="text-[13px] font-semibold tabular-nums">
-                    {tally.done}/{tally.total}
-                  </Text>
                 </View>
               ))}
           </View>

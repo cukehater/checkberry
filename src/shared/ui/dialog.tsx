@@ -159,11 +159,11 @@ export function DialogHost() {
               </View>
               <Pressable
                 onPress={() => close(cancel)}
-                // 고르는 버튼(회색 면)과 구분되게 취소는 테두리만
-                className="mt-3 h-11 items-center justify-center rounded-full border border-border-strong active:opacity-70"
+                // 고르는 버튼(회색 면)과 색으로 구분되게 취소는 삭제 확인 버튼과 같은 벽돌색 채움
+                className="mt-3 h-11 items-center justify-center rounded-full bg-danger active:opacity-70"
                 accessibilityRole="button"
               >
-                <Text className="text-[15px] font-semibold text-default-foreground">취소</Text>
+                <Text className="text-[15px] font-semibold text-danger-foreground">취소</Text>
               </Pressable>
             </>
           ) : (

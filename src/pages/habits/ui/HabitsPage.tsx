@@ -1,6 +1,6 @@
 import { router, useScrollToTop } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ComponentRef, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, type PressableProps, ScrollView, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -67,7 +67,16 @@ export function HabitsPage() {
   const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(start, -7), days[6]]);
   // 연속 기록은 보고 있는 주와 상관없이 오늘 기준. 전체 기록 대신 오늘 탭과 같은 기간만 읽는다
   const allLogs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(today, -STREAK_LOOKBACK_DAYS), today]);
-  const datesOf = (habitId: string) => new Set(allLogs.filter((l) => l.habit_id === habitId).map((l) => l.log_date));
+  // 습관별 기록 날짜. 습관마다 전체 기록을 다시 거르지 않게 한 번에 묶는다
+  const datesByHabit = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of allLogs) {
+      if (!m.has(l.habit_id)) m.set(l.habit_id, new Set());
+      m.get(l.habit_id)!.add(l.log_date);
+    }
+    return m;
+  }, [allLogs]);
+  const datesOf = (habitId: string) => datesByHabit.get(habitId) ?? new Set<string>();
   // 제목 아래 상태 요약: 보관하지 않은 습관 수, 일 단위 습관 중 가장 긴 현재 연속
   const active = allHabits.filter((h) => !h.archived_on);
   const activeCount = active.length;

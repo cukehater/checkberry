@@ -26,7 +26,7 @@ ios
 - 습관: 아이콘, 주기(매일/요일 지정/주 N회), 연속 기록, 최근 30일 달성률, 보관.
 - 삭제는 항상 확인 후 soft delete, 5초 실행취소.
 - 백업 JSON 내보내기/복원, CSV 내보내기.
-- 기술: Expo SDK 58, React Native, HeroUI Native + Uniwind(공용 UI는 `shared/ui`), Gravity UI 아이콘, 시스템 글꼴. 라이트·다크는 기기 설정을 따른다. iPad 미지원.
+- 기술: Expo SDK 58, React Native, HeroUI Native + Uniwind(공용 UI는 `shared/ui`), Gravity UI 아이콘(앱 UI)·Phosphor Icons(습관 아이콘), 시스템 글꼴. 라이트·다크는 기기 설정을 따른다. iPad 미지원.
 - 미정: 알림, 위젯, 하위 할 일.
 
 ## Brand Commitments
