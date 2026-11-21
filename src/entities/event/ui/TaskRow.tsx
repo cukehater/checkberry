@@ -14,12 +14,16 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { cn, formatMD } from '@/shared/lib';
-import { Check, duration, EASE, easing, Icon, Lozenge, PriorityIcon, SwipeRow, Text, useColor, useMotion } from '@/shared/ui';
+import { Check, duration, EASE, easing, Icon, Lozenge, SwipeRow, Text, useColor, useMotion } from '@/shared/ui';
 import type { EventRow } from '../model/repo';
 import { dday } from '../model/tasks';
 import { removeTask } from './toggleTask';
 
 type TextLayoutLine = TextLayoutEvent['nativeEvent']['lines'][number];
+
+const REPEAT_LABEL = { daily: '매일', weekly: '매주', monthly: '매월' } as const;
+// 목록에서는 높음 이상만 보여 준다
+const PRIORITY_LABEL: Record<number, string> = { 4: '높음', 5: '매우 높음' };
 
 export type ScrollRef = React.RefObject<ComponentRef<typeof ScrollView> | null>;
 
@@ -113,18 +117,21 @@ export function TaskRow({
     strike.set(reduce ? (done ? 1 : 0) : withTiming(done ? 1 : 0, { duration: duration.strike, easing: easing.standard }));
   }, [done, reduce, strike]);
   const bodyStyle = useAnimatedStyle(() => ({ opacity: 1 - 0.55 * strike.get() }));
-  // 완료는 체크로 보이고, 지연만 빨간 로젠지로 지난 일수(D+n)를 붙인다
+  // 마감 칩은 지남(D+n), 오늘(D-Day), 7일 안, 그 뒤 네 단계로 색을 바꾼다
   const overdue = !done && !!d?.overdue;
+  // 화면 시안(Tasks·Main) 기준: 지남은 벽돌, 당일(기간 중 포함)은 옅은 베리, 나머지는 회색
+  const dTone = overdue ? 'danger' : d?.label === 'D-Day' ? 'accent' : 'default';
   const range =
     task.start_date &&
     (task.end_date && task.end_date !== task.start_date
       ? `${formatMD(task.start_date, today)} – ${formatMD(task.end_date, today)}`
       : formatMD(task.start_date, today));
+  const priority = PRIORITY_LABEL[task.priority];
   return (
     <Animated.View layout={LAYOUT} exiting={EXIT}>
       {/* 왼쪽으로 끌면 삭제(확인 후). 카드 안쪽 여백(16)까지 차도록 -mx-4 */}
       <SwipeRow className="-mx-4" left={{ icon: 'trash', label: '삭제', tone: 'danger', onAction: () => removeTask(db, task) }}>
-        <Animated.View ref={ref} className={cn('min-h-[52px] flex-row items-center px-4', className)} style={glowStyle}>
+        <Animated.View ref={ref} className={cn('min-h-[50px] flex-row items-center px-4', className)} style={glowStyle}>
           {/* FR-05: 행을 누르면 완료 토글, 길게 누르면 편집 */}
           <Check
             done={done}
@@ -132,7 +139,7 @@ export function TaskRow({
             onLongPress={onPress}
             label={`${task.title} 완료`}
             hint={onPress ? '길게 누르면 편집해요' : undefined}
-            className="-ml-3 h-auto min-h-[52px] flex-1 flex-row justify-start gap-3 self-stretch py-2.5 pl-3"
+            className="-ml-3 h-auto min-h-[50px] flex-1 flex-row items-start justify-start gap-3 self-stretch py-3 pl-3"
           >
             <Animated.View className="flex-1" style={bodyStyle}>
               <View>
@@ -150,14 +157,26 @@ export function TaskRow({
               </View>
               {/* 끝낸 할 일은 날짜·반복·중요도를 숨긴다 */}
               {!done && (range || task.rrule) && (
-                <View className="mt-1 flex-row items-center gap-1.5">
-                  {overdue && <Lozenge label={d!.label} tone="danger" />}
-                  {range && <Text className={cn('text-[13px]', overdue ? 'text-danger' : 'text-muted')}>{range}</Text>}
-                  {task.rrule && <Icon name="repeat" size={12} tint={c.sub} />}
+                <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
+                  {d && <Lozenge label={d.label} tone={dTone} size="sm" />}
+                  {range && (
+                    <Text className={cn('text-[14px] leading-5', overdue ? 'text-danger-soft-foreground' : 'text-muted')}>{range}</Text>
+                  )}
+                  {task.rrule && (
+                    <View className="flex-row items-center gap-[3px]">
+                      <Icon name="repeat" size={12} tint={c.sub} />
+                      <Text className="text-[14px] leading-5 text-muted">{REPEAT_LABEL[task.rrule]}</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </Animated.View>
-            {!done && <PriorityIcon value={task.priority} />}
+            {/* 제목 첫 줄 높이(22)에 맞춘 중요도 로젠지 */}
+            {!done && priority && (
+              <View>
+                <Lozenge label={priority} tone="warning" />
+              </View>
+            )}
           </Check>
           {right}
         </Animated.View>

@@ -187,3 +187,32 @@ export async function createGroup(db: SQLiteDatabase, name: string) {
   );
   return id;
 }
+
+export async function renameGroup(db: SQLiteDatabase, id: string, name: string) {
+  await db.runAsync('UPDATE task_groups SET name = ?, updated_at = ? WHERE id = ?', name, nowIso(), id);
+}
+
+/**
+ * 그룹 삭제. 할 일은 지우지 않고 그룹 없음으로 옮긴다.
+ * restore는 그룹을 되살리고, 삭제 직전 이 그룹에 있던 할 일 중 그 뒤 다른 그룹으로 옮기지 않은 것만 다시 연결한다
+ */
+export async function deleteGroup(db: SQLiteDatabase, id: string) {
+  const now = nowIso();
+  let ids: string[] = [];
+  await db.withTransactionAsync(async () => {
+    // 지운 할 일도 포함한다. 되살렸을 때 사라진 그룹을 가리키면 어느 목록에도 안 보인다
+    ids = (await db.getAllAsync<{ id: string }>('SELECT id FROM events WHERE group_id = ?', id)).map((r) => r.id);
+    await db.runAsync('UPDATE task_groups SET deleted_at = ?, updated_at = ? WHERE id = ?', now, now, id);
+    await db.runAsync('UPDATE events SET group_id = NULL, updated_at = ? WHERE group_id = ?', now, id);
+  });
+  return {
+    restore: () =>
+      db.withTransactionAsync(async () => {
+        const at = nowIso();
+        await db.runAsync('UPDATE task_groups SET deleted_at = NULL, updated_at = ? WHERE id = ?', at, id);
+        for (const e of ids) {
+          await db.runAsync('UPDATE events SET group_id = ?, updated_at = ? WHERE id = ? AND group_id IS NULL', id, at, e);
+        }
+      }),
+  };
+}

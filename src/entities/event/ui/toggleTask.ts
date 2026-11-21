@@ -11,7 +11,7 @@ export async function toggleTask(db: SQLiteDatabase, ev: EventRow, today: DateSt
   if (next && ev.start_date) {
     const prev = ev.start_date;
     // 원래 행의 기간 길이로 시작일만 되돌린다
-    showUndo(`다음 반복: ${formatKo(next)}`, () => moveDates(db, ev, prev).then(() => {}));
+    showUndo(`다음 반복: ${formatKo(next)}`, () => moveDates(db, ev, prev).then(() => {}), 'repeat');
   }
 }
 

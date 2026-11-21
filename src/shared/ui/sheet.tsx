@@ -39,7 +39,7 @@ export function useSheetGuard(snapshot: string, ready: boolean) {
  */
 export function SheetHeader({ onSave }: { onSave: () => void }) {
   const c = useColor();
-  const font = { fontWeight: '600', fontSize: 17 } as const;
+  const font = { fontWeight: '600', fontSize: 15 } as const;
   return (
     <Stack.Screen
       options={{

@@ -1,13 +1,46 @@
-import * as Haptics from 'expo-haptics';
 import { router, useScrollToTop } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { type ComponentRef, Fragment, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
-import { dailyRate, type Habit, HABIT_SQL, HabitIcon, type HabitLog, isScheduled, toggleHabitLog } from '@/entities/habit';
+import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Pressable, type PressableProps, ScrollView, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  ReduceMotion,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import {
+  dailyRate,
+  type Habit,
+  HABIT_SQL,
+  HabitChip,
+  type HabitLog,
+  isScheduled,
+  streak,
+  STREAK_LOOKBACK_DAYS,
+  StreakBadge,
+  toggleHabitLog,
+} from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { addDays, cn, formatKo, formatMD, useToday, WEEKDAY_KO, weekStart } from '@/shared/lib';
-import { Icon, LargeTitle, ListGroup, Lozenge, Separator, Text, useColor } from '@/shared/ui';
+import { addDays, cn, formatKo, formatMD, useToday, WEEKDAY_KO, weekOfMonthLabel, weekStart } from '@/shared/lib';
+import {
+  duration,
+  easing,
+  haptic,
+  Icon,
+  IconButton,
+  LargeTitle,
+  ListGroup,
+  Lozenge,
+  RollingNumber,
+  spring,
+  Text,
+  useColor,
+  useTabBarInset,
+} from '@/shared/ui';
 
 const FILL = FadeIn.duration(160).reduceMotion(ReduceMotion.System);
 
@@ -19,57 +52,96 @@ export function HabitsPage() {
   // 지금 보고 있는 탭을 다시 누르면 맨 위로
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   useScrollToTop(scrollRef);
+  const tabBarInset = useTabBarInset();
   const [start, setStart] = useState(weekStart(today));
   // 마지막으로 누른 칸(습관|날짜). 그 칸만 채움 연출을 한다
   const [pressed, setPressed] = useState<string | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const habits = useQuery<Habit>(HABIT_SQL.allHabits).filter((h) => days.some((d) => isScheduled(h, d)));
-  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [days[0], days[6]]);
+  const allHabits = useQuery<Habit>(HABIT_SQL.allHabits);
+  const habits = allHabits.filter((h) => days.some((d) => isScheduled(h, d)));
+  // 지난주와 견주려고 한 주 앞까지 읽는다
+  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(start, -7), days[6]]);
+  // 연속 기록은 보고 있는 주와 상관없이 오늘 기준. 전체 기록 대신 오늘 탭과 같은 기간만 읽는다
+  const allLogs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(today, -STREAK_LOOKBACK_DAYS), today]);
+  const datesOf = (habitId: string) => new Set(allLogs.filter((l) => l.habit_id === habitId).map((l) => l.log_date));
+  // 제목 아래 상태 요약: 보관하지 않은 습관 수, 일 단위 습관 중 가장 긴 현재 연속
+  const active = allHabits.filter((h) => !h.archived_on);
+  const activeCount = active.length;
+  const bestStreak = Math.max(
+    0,
+    ...active.filter((h) => h.frequency_type !== 'weekly').map((h) => streak(h, datesOf(h.id), today).current),
+  );
 
   const done = new Set(logs.map((l) => `${l.habit_id}|${l.log_date}`));
   const isDone = (habitId: string, d: string) => done.has(`${habitId}|${d}`);
 
-  const past = days.filter((d) => d <= today);
-  const rates = past.map((d) => dailyRate(habits, (id) => isDone(id, d), d)).filter((r): r is number => r != null);
-  const weekRate = rates.length ? Math.round(rates.reduce((a, b) => a + b, 0) / rates.length) : null;
+  // 오늘까지의 날마다 달성률 평균. 예정 습관이 없으면 null
+  const avgRate = (ds: string[]) => {
+    const rates = ds
+      .filter((d) => d <= today)
+      .map((d) => dailyRate(allHabits, (id) => isDone(id, d), d))
+      .filter((r): r is number => r != null);
+    return rates.length ? Math.round(rates.reduce((a, b) => a + b, 0) / rates.length) : null;
+  };
+  const weekRate = avgRate(days);
+  const prevRate = avgRate(days.map((d) => addDays(d, -7)));
   const thisWeek = start === weekStart(today);
 
   return (
-    <ScrollView ref={scrollRef} className="flex-1 bg-background" contentContainerClassName="px-5 pb-20">
-      <LargeTitle title="습관" subtitle={weekRate == null ? undefined : `${thisWeek ? '이번 주 ' : ''}평균 달성률 ${weekRate}%`} />
-
-      <View className="mb-3 flex-row items-center">
-        <Pressable
-          onPress={() => setStart(addDays(start, -7))}
-          className="h-11 w-11 items-center justify-center"
-          accessibilityLabel="이전 주"
-        >
-          <Icon name="chevron-left" size={17} tint={c.accent} />
-        </Pressable>
-        <Text className="text-[15px] font-semibold tabular-nums">
-          {formatMD(days[0], today)} – {formatMD(days[6], today)}
-        </Text>
-        <Pressable
-          onPress={() => setStart(addDays(start, 7))}
-          className="h-11 w-11 items-center justify-center"
-          accessibilityLabel="다음 주"
-        >
-          <Icon name="chevron-right" size={17} tint={c.accent} />
-        </Pressable>
-        <View className="flex-1" />
-        {!thisWeek && (
-          <Pressable
-            onPress={() => setStart(weekStart(today))}
-            hitSlop={8}
-            className="min-h-9 justify-center active:opacity-60"
-            accessibilityRole="button"
-          >
-            <Text className="text-[15px] font-semibold text-accent">이번 주</Text>
-          </Pressable>
+    <ScrollView
+      ref={scrollRef}
+      className="flex-1 bg-background"
+      contentContainerClassName="gap-3 px-4"
+      contentContainerStyle={{ paddingBottom: tabBarInset }}
+    >
+      {/* 주 평균은 아래 요약 카드(WeekSummary)가 크게 보여 준다 */}
+      <View className="px-1">
+        <LargeTitle
+          title="습관"
+          accessory={
+            !thisWeek && (
+              <Pressable
+                onPress={() => setStart(weekStart(today))}
+                hitSlop={8}
+                className="min-h-9 justify-center active:opacity-60"
+                accessibilityRole="button"
+              >
+                <Text className="text-[15px] font-semibold text-accent">이번 주</Text>
+              </Pressable>
+            )
+          }
+        />
+        {activeCount > 0 && (
+          <View className="-mt-2 mb-4 flex-row gap-1.5">
+            <Lozenge label={`${activeCount}개 진행 중`} />
+            {bestStreak > 0 && <Lozenge tone="warning" icon="habits" label={`최고 연속 ${bestStreak}일`} />}
+          </View>
         )}
       </View>
 
-      {habits.length === 0 && (
+      <View className="-mx-0.5 flex-row items-center justify-between">
+        <IconButton name="chevron-left" size={16} onPress={() => setStart(addDays(start, -7))} accessibilityLabel="이전 주" />
+        {/* 주차만 보인다. 날짜 범위는 화면 읽기 프로그램이 함께 읽는다 */}
+        <Text
+          className="text-[22px] leading-7 font-bold tracking-[-0.4px] tabular-nums"
+          accessibilityLabel={`${weekOfMonthLabel(start)}, ${formatMD(days[0], today)}부터 ${formatMD(days[6], today)}까지`}
+        >
+          {weekOfMonthLabel(start)}
+        </Text>
+        <IconButton name="chevron-right" size={16} onPress={() => setStart(addDays(start, 7))} accessibilityLabel="다음 주" />
+      </View>
+
+      {weekRate != null && (
+        <WeekSummary
+          rate={weekRate}
+          delta={prevRate == null ? null : weekRate - prevRate}
+          thisWeek={thisWeek}
+          dayRates={days.map((d) => (d > today ? undefined : dailyRate(allHabits, (id) => isDone(id, d), d)))}
+        />
+      )}
+
+      {/* 습관이 아예 없을 때만 만들기를 권한다. 만들기 전이나 보관 뒤의 주는 그 주에 없었다고만 말한다 */}
+      {allHabits.length === 0 && (
         <ListGroup className="items-center gap-2 py-12">
           <Text className="text-[17px] font-semibold">아직 습관이 없어요</Text>
           <Text className="text-center text-[15px] text-muted">매일, 원하는 요일, 주 몇 회처럼{'\n'}주기를 골라 만들어 보세요.</Text>
@@ -84,101 +156,208 @@ export function HabitsPage() {
         </ListGroup>
       )}
 
+      {allHabits.length > 0 && habits.length === 0 && (
+        <ListGroup className="items-center py-8">
+          <Text className="text-[15px] text-muted">이 주에는 예정된 습관이 없어요.</Text>
+        </ListGroup>
+      )}
+
       {habits.length > 0 && (
-        <ListGroup>
-          {/* 요일은 카드 맨 위에 한 번만. 아래 칸들은 이 열에 맞춰 선다. 오늘은 파랑 */}
-          <View className="flex-row justify-between border-b-[0.5px] border-separator pt-3 pb-2">
-            {days.map((d, i) => (
-              <Text
-                key={d}
-                className={cn(
-                  'w-9 text-center text-[12px] font-semibold',
-                  d === today ? 'text-accent' : i === 0 ? 'text-danger' : 'text-muted',
-                )}
-              >
-                {WEEKDAY_KO[i]}
-              </Text>
-            ))}
-          </View>
-          {habits.map((h, hi) => {
-            const doneCount = days.filter((d) => isDone(h.id, d)).length;
-            return (
-              <Fragment key={h.id}>
-                {hi > 0 && <Separator />}
-                <View className={cn('py-3', h.archived_on && 'opacity-50')}>
-                  <Pressable
-                    className="min-h-10 flex-row items-center gap-3 active:opacity-60"
-                    onPress={() => router.push({ pathname: '/habits/[id]/edit', params: { id: h.id } })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${h.name} 편집`}
-                  >
-                    <HabitIcon iconKey={h.icon_key} size={17} tint={c.sub} filled />
-                    <Text className="flex-1 text-[16px] font-semibold" numberOfLines={1}>
-                      {h.name}
-                    </Text>
-                    {h.archived_on && <Lozenge label="보관" />}
-                    {h.frequency_type === 'weekly' ? (
-                      <Text
-                        className={cn(
-                          'text-[13px] tabular-nums',
-                          doneCount >= (h.weekly_target ?? 1) ? 'font-semibold text-success' : 'text-muted',
-                        )}
-                      >
-                        {doneCount}/{h.weekly_target ?? 1}회
-                      </Text>
-                    ) : (
-                      <Text className="text-[13px] text-muted tabular-nums">{doneCount}일</Text>
-                    )}
-                  </Pressable>
-                  <View className="mt-2 flex-row justify-between">
-                    {days.map((d, i) => {
-                      const on = isDone(h.id, d);
-                      const scheduled = isScheduled(h, d);
-                      const future = d > today;
-                      return (
-                        <Pressable
-                          key={d}
-                          disabled={!scheduled || future}
-                          onPress={() => {
-                            setPressed(`${h.id}|${d}`);
-                            Haptics.impactAsync(on ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
-                            toggleHabitLog(db, h.id, d);
-                          }}
-                          hitSlop={4}
-                          accessibilityRole="checkbox"
-                          accessibilityState={{ checked: on, disabled: !scheduled || future }}
-                          accessibilityLabel={`${h.name} ${formatKo(d)}`}
-                        >
-                          {on ? (
-                            // 누른 칸만 160ms 동안 파랑으로 찬다(화면을 처음 열 때는 연출하지 않는다)
-                            <Animated.View
-                              key="on"
-                              entering={pressed === `${h.id}|${d}` ? FILL : undefined}
-                              className="h-9 w-9 items-center justify-center rounded-lg bg-accent"
-                            >
-                              <Icon name="check" size={14} tint={c.onAccent} />
-                            </Animated.View>
-                          ) : (
-                            // 빈 칸: 할 날은 회색 칸, 쉬는 날·앞날은 옅은 테두리만, 오늘은 파란 테두리
-                            <View
-                              key="off"
-                              className={cn(
-                                'h-9 w-9 rounded-lg',
-                                scheduled && !future ? 'bg-surface' : 'border border-dashed border-separator',
-                                d === today && 'border-2 border-solid border-accent',
-                              )}
-                            />
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+        <ListGroup className="px-3 pt-3 pb-1.5">
+          {/* 요일·날짜는 카드 맨 위에 한 번만. 아래 칸들은 이 열에 맞춰 선다. 오늘은 베리 채움, 일요일은 빨강 */}
+          <View className="flex-row gap-1 pb-1.5">
+            {days.map((d, i) => {
+              const isToday = d === today;
+              const tone = isToday ? 'text-accent-foreground' : i === 0 ? 'text-danger-soft-foreground' : undefined;
+              return (
+                <View key={d} className={cn('flex-1 items-center gap-0.5 rounded-[14px] py-1.5', isToday && 'bg-accent')}>
+                  <Text className={cn('text-[11px] leading-[13px] font-semibold', tone ?? 'text-muted')}>{WEEKDAY_KO[i]}</Text>
+                  <Text className={cn('text-[16px] leading-5 tabular-nums', isToday ? 'font-bold' : 'font-medium', tone)}>
+                    {Number(d.slice(8))}
+                  </Text>
                 </View>
-              </Fragment>
+              );
+            })}
+          </View>
+          {habits.map((h) => {
+            const doneCount = days.filter((d) => isDone(h.id, d)).length;
+            const target = h.weekly_target ?? 1;
+            const weekly = h.frequency_type === 'weekly';
+            const current = streak(h, datesOf(h.id), today).current;
+            return (
+              <View key={h.id} className={cn('gap-1 border-t border-separator pt-2.5 pb-1.5', h.archived_on && 'opacity-50')}>
+                <Pressable
+                  className="min-h-11 flex-row items-center gap-2.5 px-1 active:opacity-60"
+                  onPress={() => router.push({ pathname: '/habits/[id]/edit', params: { id: h.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${h.name} 편집`}
+                >
+                  <HabitChip iconKey={h.icon_key} size={32} />
+                  <Text className="flex-1 text-[16px] leading-[22px] font-medium" numberOfLines={1}>
+                    {h.name}
+                  </Text>
+                  {h.archived_on && <Lozenge label="보관" />}
+                  {weekly && <TargetDots done={doneCount} target={target} />}
+                  {/* 0일이어도 꺼진 재로 자리를 지켜 행마다 오른쪽 끝이 맞는다 */}
+                  <StreakBadge count={current} unit={weekly ? '주' : '일'} size="md" />
+                </Pressable>
+                <View className="flex-row gap-1">
+                  {days.map((d) => {
+                    const on = isDone(h.id, d);
+                    const scheduled = isScheduled(h, d);
+                    const future = d > today;
+                    const isToday = d === today;
+                    return (
+                      <Cell
+                        key={d}
+                        disabled={!scheduled || future}
+                        onPress={() => {
+                          setPressed(`${h.id}|${d}`);
+                          if (on) haptic.uncheck();
+                          else haptic.checkStrong();
+                          toggleHabitLog(db, h.id, d);
+                        }}
+                        className={cn('h-11 flex-1 items-center justify-center rounded-[14px]', isToday && 'bg-accent-soft')}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: on, disabled: !scheduled || future }}
+                        accessibilityLabel={`${h.name} ${formatKo(d)}`}
+                      >
+                        {on ? (
+                          // 누른 칸만 160ms 동안 베리로 찬다(화면을 처음 열 때는 연출하지 않는다)
+                          <Animated.View
+                            key="on"
+                            entering={pressed === `${h.id}|${d}` ? FILL : undefined}
+                            className="h-[30px] w-[30px] items-center justify-center rounded-full bg-accent"
+                          >
+                            <Icon name="check" size={16} tint={c.onAccent} />
+                          </Animated.View>
+                        ) : scheduled ? (
+                          // 할 날인데 안 한 칸: 빈 원. 오늘은 베리 테두리
+                          <View
+                            key="off"
+                            className={cn(
+                              'h-[30px] w-[30px] rounded-full',
+                              isToday ? 'border-2 border-accent' : 'border-[1.75px] border-track',
+                            )}
+                          />
+                        ) : (
+                          // 예정 아닌 날: 작은 점
+                          <View key="rest" className="h-[5px] w-[5px] rounded-full bg-track" />
+                        )}
+                      </Cell>
+                    );
+                  })}
+                </View>
+              </View>
             );
           })}
         </ListGroup>
       )}
     </ScrollView>
+  );
+}
+
+type CellProps = Omit<PressableProps, 'children'> & { children: ReactNode; onPress: () => void };
+
+// 칸을 누르면 원이 0.8배로 눌렸다가 spring으로 살짝 넘쳐(약 1.1배) 돌아온다. 동작 줄이기면 튀지 않는다
+function Cell({ children, onPress, ...rest }: CellProps) {
+  const reduce = useReducedMotion();
+  const scale = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  return (
+    <Pressable
+      {...rest}
+      onPress={() => {
+        if (!reduce) scale.set(withSequence(withTiming(0.8, { duration: 80 }), withSpring(1, spring.pop)));
+        onPress();
+      }}
+    >
+      <Animated.View style={style}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
+// 주 N회 진행: 목표 개수만큼 점, 한 만큼 베리로 찬다. 목표를 채우면 잎색
+function TargetDots({ done, target }: { done: number; target: number }) {
+  return (
+    <View className="flex-row gap-1" accessible accessibilityLabel={`이번 주 ${done}/${target}회`}>
+      {Array.from({ length: target }, (_, i) => (
+        <View
+          key={i}
+          className={cn('h-[7px] w-[7px] rounded-full', i >= done ? 'bg-track' : done >= target ? 'bg-success' : 'bg-accent')}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * 주 요약 카드: 큰 평균 % + 지난주 대비(▲ 잎 / ▼ 벽돌) + 요일마다 베리 한 알.
+ * 베리는 그날 달성률만큼 아래에서부터 익는다(베리), 덜 익은 부분은 잎 soft. 아래 습관 카드의 요일 열과 같은 폭으로 선다
+ */
+function WeekSummary({
+  rate,
+  delta,
+  thisWeek,
+  dayRates,
+}: {
+  rate: number;
+  delta: number | null;
+  thisWeek: boolean;
+  /** 날마다 달성률. undefined = 아직 안 온 날, null = 예정 습관 없음 */
+  dayRates: (number | null | undefined)[];
+}) {
+  const up = delta != null && delta >= 1;
+  const down = delta != null && delta <= -1;
+  return (
+    <ListGroup className="gap-3 px-3 py-3.5">
+      <View
+        className="flex-row items-end gap-2 px-1"
+        accessible
+        accessibilityLabel={`${thisWeek ? '이번 주 ' : ''}평균 달성률 ${rate}%${up ? `, 지난주보다 ${delta}%p 올랐어요` : down ? `, 지난주보다 ${-delta!}%p 내렸어요` : ''}`}
+      >
+        <RollingNumber value={`${rate}%`} className="text-[34px] leading-[40px] font-bold" />
+        <View className="pb-1.5">
+          {(up || down) && (
+            <Text className={cn('text-[13px] leading-4 font-semibold', up ? 'text-success-soft-foreground' : 'text-danger')}>
+              {up ? '▲' : '▼'} {Math.abs(delta!)}%p
+            </Text>
+          )}
+          <Text className="text-[13px] leading-4 text-muted">{up || down ? '지난주보다' : thisWeek ? '이번 주 평균' : '주 평균'}</Text>
+        </View>
+      </View>
+      <View className="flex-row gap-1" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {dayRates.map((r, i) => (
+          <View key={i} className="h-[34px] flex-1 items-center justify-end">
+            <Berry rate={r} />
+          </View>
+        ))}
+      </View>
+    </ListGroup>
+  );
+}
+
+// 베리 한 알. 달성률만큼 아래에서부터 베리로 찬다(값이 바뀌면 부드럽게, 동작 줄이기면 즉시)
+function Berry({ rate }: { rate: number | null | undefined }) {
+  const fill = useSharedValue(rate ?? 0);
+  useEffect(() => {
+    fill.set(withTiming(rate ?? 0, { duration: duration.collapse, easing: easing.standard, reduceMotion: ReduceMotion.System }));
+  }, [rate, fill]);
+  const style = useAnimatedStyle(() => ({ height: `${fill.get()}%` }));
+  // 예정 습관이 없던 날: 작은 점
+  if (rate === null) return <View className="mb-[11px] h-[5px] w-[5px] rounded-full bg-track" />;
+  return (
+    <View className="items-center">
+      {/* 꼭지 잎. 아직 안 온 날은 흐린 track */}
+      <View className={cn('-mb-0.5 h-1.5 w-2.5 rounded-full', rate === undefined ? 'bg-track' : 'bg-success')} />
+      <View
+        className={cn(
+          'h-[26px] w-[26px] justify-end overflow-hidden rounded-full',
+          rate === undefined ? 'border-[1.75px] border-track' : 'bg-success-soft',
+        )}
+      >
+        <Animated.View className="w-full bg-accent" style={style} />
+      </View>
+    </View>
   );
 }

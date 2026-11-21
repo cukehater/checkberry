@@ -1,8 +1,9 @@
 import { Button } from 'heroui-native';
 import { router, useScrollToTop } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { type ComponentRef, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import {
   compareTasks,
   EVENT_SQL,
@@ -14,27 +15,44 @@ import {
   toggleTask,
   useHighlight,
 } from '@/entities/event';
-import { type Habit, HABIT_SQL, type HabitLog, HabitTile, isScheduled, streak, toggleHabitLog, weekCount } from '@/entities/habit';
+import {
+  type Habit,
+  HABIT_SQL,
+  type HabitLog,
+  HabitTile,
+  isMilestone,
+  isScheduled,
+  streak,
+  STREAK_LOOKBACK_DAYS,
+  StreakToastIcon,
+  toggleHabitLog,
+  weekCount,
+} from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { addDays, formatKo, toDateStr, useSettledOrder, useToday } from '@/shared/lib';
-import { ListGroup, ListHeader, Lozenge, Text, useColor } from '@/shared/ui';
+import { addDays, toDateStr, useSettledOrder, useToday, weekday, WEEKDAY_KO } from '@/shared/lib';
+import { haptic, ListGroup, ListHeader, Lozenge, showToast, Text, useColor, useTabBarInset } from '@/shared/ui';
 import { QuickAddRow } from './QuickAddRow';
 import { TodayProgressCard } from './TodayProgressCard';
 
 const taskId = (e: EventRow) => e.id;
 const taskDone = (e: EventRow) => !!e.completed_at;
+const unitOf = (h: Habit) => (h.frequency_type === 'weekly' ? '주' : h.frequency_type === 'weekdays' ? '회' : '일');
 
 // S01 오늘. 노션 대시보드 'JUST DO IT.' 대체(L-01)
+// '11월 21일 토요일'
+const longDate = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일 ${WEEKDAY_KO[weekday(d)]}요일`;
+
 export function TodayPage() {
   const db = useSQLiteContext();
   const c = useColor();
   const today = useToday();
   const habits = useQuery<Habit>(HABIT_SQL.activeHabits).filter((h) => isScheduled(h, today));
   // streak 계산용 최근 1년치(3-2 규칙 6)
-  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(today, -400), today]);
+  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(today, -STREAK_LOOKBACK_DAYS), today]);
   const events = useQuery<EventRow>(EVENT_SQL.events);
   const highlight = useHighlight();
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+  const tabBarInset = useTabBarInset();
   // 지금 보고 있는 탭을 다시 누르면 맨 위로
   useScrollToTop(scrollRef);
 
@@ -72,9 +90,20 @@ export function TodayPage() {
   // 마지막 하나를 이 화면에서 직접 끝낸 순간에만 베리가 퍼진다. 화면을 열 때 이미 다 끝나 있으면 연출 없이 보여 준다
   const [finishing, setFinishing] = useState(false);
   const finishesDay = itemsDone + 1 === itemsAll && overdueOpen.length === 0;
-  const check = (id: string) => {
-    setFinishing(!isDone(id) && finishesDay);
-    toggleHabitLog(db, id, today);
+  const check = (h: Habit) => {
+    const finishes = !isDone(h.id) && finishesDay;
+    setFinishing(finishes);
+    if (!isDone(h.id)) {
+      // 이 체크로 연속 기록이 이정표(3·7·14·30·100)에 닿으면 축하. 모두 완료와 겹치면 햅틱은 모두 완료 쪽만
+      const dates = doneByHabit.get(h.id) ?? new Set<string>();
+      const before = streak(h, dates, today).current;
+      const after = streak(h, new Set(dates).add(today), today).current;
+      if (after > before && isMilestone(after)) {
+        if (!finishes) haptic.milestone();
+        showToast({ message: `${h.name} ${after}${unitOf(h)} 연속이에요!`, tone: 'success', leading: <StreakToastIcon count={after} /> });
+      }
+    }
+    toggleHabitLog(db, h.id, today);
   };
   const toggle = (e: EventRow, hold: (id: string) => void) => {
     setFinishing(!e.completed_at && !e.rrule && todays.includes(e) && finishesDay);
@@ -116,11 +145,12 @@ export function TodayPage() {
   );
 
   const hour = new Date().getHours();
+  // 카드 맨 위 한 줄 배너. 넘치면 글자를 줄여 한 줄을 지킨다
   const greeting =
     itemsAll === 0
       ? '오늘 딸 체크베리가 아직 없어요'
       : allDone
-        ? '오늘 체크베리를 다 땄어요'
+        ? '체크베리를 모두 수확했어요'
         : hour < 12
           ? '좋은 아침이에요'
           : hour < 18
@@ -134,15 +164,31 @@ export function TodayPage() {
   );
 
   // 2열 타일. 홀수면 마지막 줄 오른쪽을 빈 칸으로 채워 너비를 맞춘다
-  const habitRows: Habit[][] = [];
-  for (let i = 0; i < habits.length; i += 2) habitRows.push(habits.slice(i, i + 2));
 
   return (
-    <ScrollView ref={scrollRef} className="flex-1 bg-background" contentContainerClassName="px-4 pb-24">
-      <Text className="mt-1 text-[34px] leading-10 font-bold tracking-[-0.8px]" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
+    // 바로 추가 칸에 포커스하면 키보드 위 16pt로 올라온다. KeyboardAwareScrollView는 className 대상이 아니라 style로 지정한다
+    <KeyboardAwareScrollView
+      ref={scrollRef}
+      style={{ flex: 1, backgroundColor: c.bg }}
+      // 떠 있는 탭 바 뒤에 마지막 카드가 가리지 않게 한다
+      contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset }}
+      bottomOffset={16}
+      // 키보드가 열린 채로 '추가' 버튼이 한 번에 눌리게 한다
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* 날짜를 베리 soft 알약으로 제목 위에 둔다(오늘이 며칠인지가 이 화면의 첫 정보) */}
+      <View className="mt-1 h-7 justify-center self-start rounded-full bg-accent-soft px-3">
+        <Text className="text-[14px] leading-5 font-semibold text-accent-soft-foreground" maxFontSizeMultiplier={1.3}>
+          {longDate(today)}
+        </Text>
+      </View>
+      <Text
+        className="mt-1.5 mb-4 text-[34px] leading-10 font-bold tracking-[-0.8px]"
+        accessibilityRole="header"
+        maxFontSizeMultiplier={1.3}
+      >
         오늘
       </Text>
-      <Text className="mt-0.5 mb-4 text-[14px] font-medium text-muted">{formatKo(today)}</Text>
 
       <TodayProgressCard
         greeting={greeting}
@@ -180,35 +226,24 @@ export function TodayPage() {
             {textLink('습관 추가', () => router.push('/habits/new'))}
           </View>
         ) : (
-          // 누르면 체크, 길게 누르면 편집. 연속 기록·주 N회 진행은 타일 아래 옅은 글자(사흘 이상·주 목표 달성이면 불꽃과 초록)
+          // 누르면 체크, 길게 누르면 편집. 타일 아래 연속 기록 알약(3 이상이면 초록 불꽃), 주 N회는 이번 주 점
           <View className="gap-2">
-            {habitRows.map((row) => (
-              <View key={row[0].id} className="flex-row gap-2">
-                {row.map((h) => {
-                  const dates = doneByHabit.get(h.id) ?? new Set<string>();
-                  const unit = h.frequency_type === 'weekdays' ? '회' : '일';
-                  const st = streak(h, dates, today);
-                  const week = weekCount(dates, today);
-                  const target = h.weekly_target ?? 1;
-                  const meta =
-                    h.frequency_type === 'weekly' ? `이번 주 ${week}/${target}` : st.current > 0 ? `${st.current}${unit} 연속` : undefined;
-                  const strong = h.frequency_type === 'weekly' ? week >= target : st.current >= 3;
-                  return (
-                    <HabitTile
-                      key={h.id}
-                      name={h.name}
-                      iconKey={h.icon_key}
-                      done={isDone(h.id)}
-                      meta={meta}
-                      metaStrong={strong}
-                      onToggle={() => check(h.id)}
-                      onLongPress={() => edit(h.id)}
-                    />
-                  );
-                })}
-                {row.length === 1 && <View className="flex-1" />}
-              </View>
-            ))}
+            {habits.map((h) => {
+              const dates = doneByHabit.get(h.id) ?? new Set<string>();
+              const weekly = h.frequency_type === 'weekly';
+              return (
+                <HabitTile
+                  key={h.id}
+                  name={h.name}
+                  iconKey={h.icon_key}
+                  done={isDone(h.id)}
+                  streak={{ count: streak(h, dates, today).current, unit: unitOf(h) }}
+                  week={weekly ? { done: weekCount(dates, today), target: h.weekly_target ?? 1 } : undefined}
+                  onToggle={() => check(h)}
+                  onLongPress={() => edit(h.id)}
+                />
+              );
+            })}
           </View>
         )}
       </ListGroup>
@@ -239,6 +274,6 @@ export function TodayPage() {
           undefined,
           <ListHeader inCard title="날짜 없는 할 일" count={String(undated.filter((e) => !e.completed_at).length)} />,
         )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }

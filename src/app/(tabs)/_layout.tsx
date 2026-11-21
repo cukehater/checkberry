@@ -1,12 +1,26 @@
 import { type Href, Link, Redirect } from 'expo-router';
-import { Tabs } from 'expo-router/js-tabs';
+import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { getSetting } from '@/shared/db';
-import { useToday } from '@/shared/lib';
-import { BrandMark, Icon, type IconName, Text, useColor } from '@/shared/ui';
+import { cn, useToday } from '@/shared/lib';
+import {
+  BrandMark,
+  CHIP_EDGE,
+  CHIP_GAP,
+  Icon,
+  IconButton,
+  type IconName,
+  TAB_BAR_HEIGHT,
+  Text,
+  useColor,
+  useOverlayShadow,
+  usePressScale,
+  useTabBarBottom,
+} from '@/shared/ui';
 
 const TABS: { name: string; title: string; icon: IconName }[] = [
   { name: 'index', title: '오늘', icon: 'today' },
@@ -45,6 +59,78 @@ function SwipeToTab({ routeName, onSwipe, children }: { routeName: string; onSwi
   );
 }
 
+function TabItem({
+  tab,
+  focused,
+  onPress,
+  onLongPress,
+}: {
+  tab: (typeof TABS)[number];
+  focused: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const c = useColor();
+  const press = usePressScale();
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      className="flex-1"
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={tab.title}
+    >
+      <Animated.View
+        className={cn('flex-1 items-center justify-center gap-[3px] rounded-[26px]', focused && 'bg-accent-soft')}
+        style={press.style}
+      >
+        <Icon name={tab.icon} size={20} tint={focused ? c.accentInk : c.sub} filled={focused} />
+        <Text
+          className={cn('text-[11px] leading-[13px]', focused ? 'font-semibold text-accent-soft-foreground' : 'font-medium text-muted')}
+          maxFontSizeMultiplier={1.2}
+        >
+          {tab.title}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// 떠 있는 알약 탭 바(좌우 16, 높이 64, 안쪽 6). 고른 탭만 베리 soft 알약 위 채운 아이콘과 베리 글자.
+// 화면 위에 겹쳐 뜨므로 탭 화면의 스크롤 콘텐츠는 useTabBarInset()만큼 아래를 비운다
+function PillTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
+  const bottom = useTabBarBottom();
+  const shadow = useOverlayShadow();
+  return (
+    <View
+      className="absolute right-4 left-4 flex-row gap-1 rounded-[32px] bg-bar p-1.5"
+      style={[{ bottom, height: TAB_BAR_HEIGHT }, shadow]}
+      accessibilityRole="tablist"
+    >
+      {state.routes.map((route, i) => {
+        const tab = TABS.find((t) => t.name === route.name);
+        if (!tab) return null;
+        const focused = state.index === i;
+        return (
+          <TabItem
+            key={route.key}
+            tab={tab}
+            focused={focused}
+            onPress={() => {
+              const e = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !e.defaultPrevented) navigateToTab(route.key);
+            }}
+            onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   const db = useSQLiteContext();
   const c = useColor();
@@ -63,19 +149,21 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      screenLayout={({ route, navigation, children }) => (
-        <SwipeToTab routeName={route.name} onSwipe={(name) => navigation.navigate(name)}>
-          {children}
-        </SwipeToTab>
-      )}
+      tabBar={(props) => <PillTabBar {...props} />}
+      // 캘린더는 달력 좌우 밀기가 달·주 넘김이라 탭 이동 밀기를 끈다
+      screenLayout={({ route, navigation, children }) =>
+        route.name === 'calendar' ? (
+          children
+        ) : (
+          <SwipeToTab routeName={route.name} onSwipe={(name) => navigation.navigate(name)}>
+            {children}
+          </SwipeToTab>
+        )
+      }
       screenOptions={({ route }) => {
         return {
           // 탭을 옮길 때 방향에 맞춰 살짝 밀리며 바뀐다
           animation: 'shift',
-          tabBarActiveTintColor: c.accent,
-          tabBarInactiveTintColor: c.sub,
-          tabBarLabelStyle: { fontWeight: '600', fontSize: 11 },
-          tabBarStyle: { backgroundColor: c.bar, borderTopColor: c.line, borderTopWidth: 0.5 },
           headerStyle: { backgroundColor: c.bg },
           headerTitleStyle: { color: c.text, fontWeight: '600', fontSize: 17 },
           headerShadowVisible: false,
@@ -92,19 +180,13 @@ export default function TabsLayout() {
               : undefined,
           sceneStyle: { backgroundColor: c.bg },
           headerRight: () => (
-            <View className="flex-row pr-1">
+            // IconButton은 누르는 영역 44 안에 40 칩이라 칩 바깥에 2pt씩 여백이 있다. 그만큼 빼서 칩 사이 CHIP_GAP, 가장자리 CHIP_EDGE
+            <View className="flex-row" style={{ gap: CHIP_GAP - 4, paddingRight: CHIP_EDGE - 2 }}>
               <Link href={addHref(route.name)} asChild>
-                <Pressable
-                  className="h-11 w-11 items-center justify-center"
-                  accessibilityLabel={route.name === 'habits' ? '습관 추가' : '할 일 추가'}
-                >
-                  <Icon name="plus" size={22} tint={c.accent} />
-                </Pressable>
+                <IconButton name="plus" tone="accent" accessibilityLabel={route.name === 'habits' ? '습관 추가' : '할 일 추가'} />
               </Link>
               <Link href="/settings" asChild>
-                <Pressable className="h-11 w-11 items-center justify-center" accessibilityLabel="설정" accessibilityRole="button">
-                  <Icon name="settings" size={20} tint={c.sub} />
-                </Pressable>
+                <IconButton name="settings" accessibilityLabel="설정" />
               </Link>
             </View>
           ),
@@ -112,14 +194,7 @@ export default function TabsLayout() {
       }}
     >
       {TABS.map((t) => (
-        <Tabs.Screen
-          key={t.name}
-          name={t.name}
-          options={{
-            title: t.title,
-            tabBarIcon: ({ color: tint, focused }) => <Icon name={t.icon} size={22} tint={tint as string} filled={focused} />,
-          }}
-        />
+        <Tabs.Screen key={t.name} name={t.name} options={{ title: t.title }} />
       ))}
     </Tabs>
   );

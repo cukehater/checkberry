@@ -23,7 +23,9 @@ const LIGHT = {
   successSoft: '#EDF6E1',
   successInk: '#3D7311',
   warning: '#F5A524',
+  warningInk: '#8A5E1F',
   danger: '#C2410C',
+  dangerInk: '#B23A0B',
   // 카드 그림자를 켤지(다크는 면 밝기로 층을 나눈다)
   raised: true,
 };
@@ -47,11 +49,27 @@ const DARK: typeof LIGHT = {
   successSoft: '#1F2C14',
   successInk: '#A6DB74',
   warning: '#F7B750',
+  warningInk: '#FAD094',
   danger: '#C8401A',
+  dangerInk: '#F59A70',
   raised: false,
 };
 
 /** 기기의 라이트·다크 설정에 맞는 색 */
 export function useColor() {
   return useColorScheme() === 'dark' ? DARK : LIGHT;
+}
+
+/** 떠 있는 면(탭 바, 실행취소 바, 다이얼로그)의 그림자(--shadow-overlay). 다크는 짙은 그림자 + 옅은 1pt 테두리 */
+export function useOverlayShadow() {
+  return useColor().raised
+    ? { shadowColor: '#3C2814', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } }
+    : {
+        shadowColor: '#000',
+        shadowOpacity: 0.5,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 12 },
+        borderWidth: 1,
+        borderColor: 'rgba(255,240,230,0.08)',
+      };
 }

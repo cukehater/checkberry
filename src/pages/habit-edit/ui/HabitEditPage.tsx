@@ -5,11 +5,9 @@ import {
   type Habit,
   HABIT_SQL,
   HabitChip,
-  HabitIcon,
   type HabitLog,
   habitRate30,
-  ICON_KEYS,
-  ICON_LABELS,
+  iconLabel,
   parseWeekdays,
   restoreHabit,
   saveHabit,
@@ -21,27 +19,32 @@ import { useQuery } from '@/shared/db';
 import { cn, fieldErrors, useFocusAfterTransition, useToday, WEEKDAY_KO } from '@/shared/lib';
 import {
   ActionButton,
+  CARD_SHADOW,
   confirm,
-  Chip,
-  DateField,
   FormScreen,
+  Icon,
   Input,
   ListGroup,
   Section,
+  Segmented,
   SheetHeader,
+  showToast,
   showUndo,
   Text,
   useColor,
   useSheetGuard,
 } from '@/shared/ui';
 import { habitSchema } from '../model/schema';
+import { DateCard } from './DateCard';
+import { IconPicker } from './IconPicker';
 
 type Frequency = 'daily' | 'weekdays' | 'weekly';
-const FREQUENCIES: [Frequency, string][] = [
+const FREQUENCIES = [
   ['daily', '매일'],
   ['weekdays', '요일 지정'],
   ['weekly', '주 N회'],
-];
+] as const;
+const TIMES = (['1', '2', '3', '4', '5', '6'] as const).map((n) => [n, `${n}회`] as const);
 const STREAK_UNIT: Record<Frequency, string> = { daily: '일', weekdays: '회', weekly: '주' };
 
 // S06 습관 등록·편집(3-2-1). 완료 체크형, 주기는 매일·요일 지정·주 N회
@@ -58,8 +61,10 @@ export function HabitEditPage({ id }: { id?: string }) {
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [weeklyTarget, setWeeklyTarget] = useState(3);
   const logs = useQuery<HabitLog>(HABIT_SQL.logsOf, [id ?? '']);
-  const [submitted, setSubmitted] = useState(false);
+  // 저장을 누른 횟수. 0보다 크면 오류를 보여 주고, 바뀔 때마다 오류 칸이 다시 흔들린다
+  const [attempts, setAttempts] = useState(0);
   const [loaded, setLoaded] = useState(!id);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -93,11 +98,12 @@ export function HabitEditPage({ id }: { id?: string }) {
     : null;
   const trimmed = name.trim();
   const errors = fieldErrors(habitSchema, { name, startDate, frequency, weekdays, weeklyTarget });
-  const shown = submitted ? errors : {};
+  const shown = attempts ? errors : {};
 
   const save = async () => {
-    setSubmitted(true);
-    if (Object.keys(errors).length) return;
+    setAttempts(attempts + 1);
+    const first = Object.values(errors)[0];
+    if (first) return showToast({ message: first, tone: 'error' });
     await saveHabit(db, id ?? null, {
       name: trimmed,
       icon_key: icon,
@@ -143,17 +149,19 @@ export function HabitEditPage({ id }: { id?: string }) {
   return (
     <FormScreen>
       <SheetHeader onSave={save} />
-      <ListGroup className="py-4">
-        <View className="flex-row items-center gap-3" accessibilityLabel="미리보기">
-          <HabitChip iconKey={icon} size={44} />
-          <Text className={cn('flex-1 text-[22px] font-bold', !trimmed && 'text-muted')}>{trimmed || '습관 이름'}</Text>
+      <ListGroup className="px-0">
+        <View className="items-center gap-2.5 px-4 pt-5 pb-4" accessibilityLabel="미리보기">
+          <HabitChip iconKey={icon} size={64} />
+          <Text className={cn('text-center text-[20px] leading-7 font-semibold tracking-[-0.3px]', !trimmed && 'text-muted')}>
+            {trimmed || '습관 이름'}
+          </Text>
         </View>
         {stats && (
-          <View className="mt-4 flex-row border-t-[0.5px] border-separator pt-4">
+          <View className="flex-row border-t-[0.5px] border-separator">
             {stats.map(([label, value]) => (
-              <View key={label} className="flex-1 gap-0.5">
-                <Text className="text-[13px] text-muted">{label}</Text>
-                <Text className="text-[20px] font-semibold tabular-nums">{value}</Text>
+              <View key={label} className="flex-1 items-center gap-0.5 px-1 pt-3 pb-3.5">
+                <Text className="text-[22px] leading-7 font-bold tracking-[-0.4px] tabular-nums">{value}</Text>
+                <Text className="text-[13px] leading-[18px] text-muted">{label}</Text>
               </View>
             ))}
           </View>
@@ -168,57 +176,51 @@ export function HabitEditPage({ id }: { id?: string }) {
           placeholder="예: 책 20쪽 읽기"
           ref={nameRef}
           accessibilityLabel="습관 이름"
+          invalid={!!shown.name}
+          shakeKey={attempts}
         />
-        {shown.name && <Text className="px-4 text-[13px] text-danger">{shown.name}</Text>}
       </Section>
 
-      <Section title="아이콘">
-        <View className="flex-row flex-wrap gap-2">
-          {ICON_KEYS.map((k) => (
-            <Pressable
-              key={k}
-              onPress={() => setIcon(k)}
-              className={cn(
-                'h-11 w-11 items-center justify-center rounded-lg border active:opacity-70',
-                k === icon ? 'border-accent bg-accent-soft' : 'border-separator bg-card',
-              )}
-              accessibilityRole="button"
-              accessibilityState={{ selected: k === icon }}
-              accessibilityLabel={`${ICON_LABELS[k]} 아이콘`}
-            >
-              <HabitIcon iconKey={k} size={19} tint={k === icon ? c.accent : c.sub} filled={k === icon} />
-            </Pressable>
-          ))}
-        </View>
-      </Section>
+      <Pressable
+        onPress={() => setPicking(true)}
+        className="h-14 flex-row items-center gap-3 rounded-[20px] bg-card px-4 active:opacity-70"
+        style={c.raised ? CARD_SHADOW : undefined}
+        accessibilityRole="button"
+        accessibilityLabel={`아이콘 고르기, 지금 ${iconLabel(icon)}`}
+      >
+        <HabitChip iconKey={icon} size={32} />
+        <Text className="flex-1 text-[16px] font-medium">아이콘 고르기</Text>
+        <Text className="max-w-[45%] text-[15px] text-muted" numberOfLines={1}>
+          {iconLabel(icon)}
+        </Text>
+        <Icon name="chevron-right" size={14} tint={c.sub} />
+      </Pressable>
+      <IconPicker visible={picking} value={icon} onPick={setIcon} onClose={() => setPicking(false)} />
 
       <Section title="주기">
-        <View className="flex-row flex-wrap gap-2">
-          {FREQUENCIES.map(([f, label]) => (
-            <Chip key={f} label={label} on={frequency === f} onPress={() => setFrequency(f)} />
-          ))}
-        </View>
-        {frequency === 'weekdays' && (
-          <View className="flex-row justify-between">
+        <Segmented options={FREQUENCIES} value={frequency} onChange={setFrequency} />
+      </Section>
+
+      {frequency === 'weekdays' && (
+        <Section title="요일">
+          <View className="flex-row gap-1.5">
             {WEEKDAY_KO.map((w, i) => {
               const on = weekdays.includes(i);
               return (
                 <Pressable
                   key={w}
                   onPress={() => setWeekdays(on ? weekdays.filter((x) => x !== i) : [...weekdays, i])}
-                  className={cn(
-                    'h-11 w-11 items-center justify-center rounded-lg border active:opacity-70',
-                    on ? 'border-accent bg-accent-soft' : 'border-separator bg-card',
-                  )}
+                  className={cn('h-11 flex-1 items-center justify-center rounded-full active:opacity-70', on ? 'bg-accent' : 'bg-card')}
+                  style={!on && c.raised ? CARD_SHADOW : undefined}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
                   accessibilityLabel={`${w}요일`}
                 >
                   <Text
                     className={cn(
-                      'text-sm font-medium',
-                      on && 'font-semibold text-accent-soft-foreground',
-                      !on && i === 0 && 'text-danger',
+                      'text-[15px] font-semibold',
+                      on && 'text-accent-foreground',
+                      !on && i === 0 && 'text-danger-soft-foreground',
                     )}
                   >
                     {w}
@@ -227,26 +229,21 @@ export function HabitEditPage({ id }: { id?: string }) {
               );
             })}
           </View>
-        )}
-        {frequency === 'weekly' && (
-          <View className="flex-row flex-wrap gap-2">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <Chip key={n} label={`주 ${n}회`} on={weeklyTarget === n} onPress={() => setWeeklyTarget(n)} />
-            ))}
-          </View>
-        )}
-        {shown.weekdays && <Text className="px-4 text-[13px] text-danger">{shown.weekdays}</Text>}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="시작일">
-        <DateField label="시작일" value={startDate} fallback={today} onChange={setStartDate} />
-        {shown.startDate && <Text className="px-4 text-[13px] text-danger">{shown.startDate}</Text>}
-      </Section>
+      {frequency === 'weekly' && (
+        <Section title="주당 횟수">
+          <Segmented options={TIMES} value={String(weeklyTarget)} onChange={(n) => setWeeklyTarget(Number(n))} />
+        </Section>
+      )}
+
+      <DateCard label="시작일" value={startDate} onChange={setStartDate} />
 
       {habit && (
-        <View className="mt-4 gap-1">
-          <ActionButton label={habit.archived_on ? '보관 해제' : '보관'} tone="plain" onPress={toggleArchive} />
-          <ActionButton label="습관 삭제" tone="danger" onPress={remove} />
+        <View className="gap-2.5">
+          <ActionButton label={habit.archived_on ? '보관 해제' : '보관'} tone="plain" icon="archive" onPress={toggleArchive} />
+          <ActionButton label="습관 삭제" tone="danger" icon="trash" onPress={remove} />
         </View>
       )}
     </FormScreen>

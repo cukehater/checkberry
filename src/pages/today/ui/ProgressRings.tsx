@@ -1,15 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { View } from 'react-native';
-import Animated, {
-  type SharedValue,
-  useAnimatedProps,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-  ZoomIn,
-} from 'react-native-reanimated';
+import Animated, { type SharedValue, useAnimatedProps, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, G } from 'react-native-svg';
-import { CelebrationBurst, duration, easing, haptic, MARK, Text, useColor } from '@/shared/ui';
+import { duration, easing, RollingNumber, Text, useColor } from '@/shared/ui';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -32,25 +25,19 @@ function useAnimatedRatio(target: number): SharedValue<number> {
 
 /**
  * 오늘 진행률 이중 링. 바깥은 습관(강조색), 안쪽은 오늘 할 일(잎 초록), 가운데는 합친 완료율.
- * allDone이면 가운데가 로고 마크로 바뀌고, 직접 끝내 완료로 바뀐 순간에만 베리가 퍼지며 성공 햅틱이 한 번 울린다
+ * 모두 완료 연출은 TodayProgressCard가 카드 전체로 한다
  */
 export function ProgressRings({
   habitsDone,
   habitsTotal,
   tasksDone,
   tasksTotal,
-  allDone,
-  finishing,
   size = 140,
 }: {
   habitsDone: number;
   habitsTotal: number;
   tasksDone: number;
   tasksTotal: number;
-  /** 지연된 할 일까지 없어야 완료다(링 분모에는 지연이 없다) */
-  allDone: boolean;
-  /** 이 화면에서 마지막 하나를 직접 끝냈을 때만 축하한다(다른 탭에서 끝내거나 남은 것을 지운 경우는 조용히) */
-  finishing: boolean;
   size?: number;
 }) {
   const c = useColor();
@@ -63,21 +50,6 @@ export function ProgressRings({
   // 0일 때 둥근 선끝이 점으로 남지 않게 숨긴다
   const outerProps = useAnimatedProps(() => ({ strokeDashoffset: C_OUT * (1 - h.get()), strokeOpacity: h.get() > 0.001 ? 1 : 0 }));
   const innerProps = useAnimatedProps(() => ({ strokeDashoffset: C_IN * (1 - t.get()), strokeOpacity: t.get() > 0.001 ? 1 : 0 }));
-
-  // 처음부터 완료 상태로 열면 조용히 마크만 보인다
-  const wasDone = useRef(allDone);
-  const [celebrate, setCelebrate] = useState(false);
-  useEffect(() => {
-    const changed = allDone && !wasDone.current;
-    wasDone.current = allDone;
-    if (!changed || !finishing) return;
-    haptic.allDone();
-    setCelebrate(true);
-    const id = setTimeout(() => setCelebrate(false), duration.burst + 200);
-    return () => clearTimeout(id);
-  }, [allDone, finishing]);
-
-  const markSize = Math.round(size * 0.43);
 
   return (
     <View
@@ -117,33 +89,14 @@ export function ProgressRings({
       </Svg>
 
       <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
-        {allDone ? (
-          <Animated.Image
-            entering={ZoomIn.springify().damping(10).stiffness(320)}
-            source={MARK}
-            style={{ width: markSize, height: markSize }}
-            accessibilityIgnoresInvertColors
-          />
-        ) : (
-          <>
-            <Text
-              className="font-bold tracking-[-1px] tabular-nums"
-              style={{ fontSize: size * 0.214, lineHeight: size * 0.243 }}
-              maxFontSizeMultiplier={1.3}
-            >
-              {pct}
-              <Text className="font-semibold tracking-normal" style={{ fontSize: size * 0.107 }}>
-                %
-              </Text>
-            </Text>
-            <Text className="text-[12px] leading-4 font-medium text-muted tabular-nums" maxFontSizeMultiplier={1.3}>
-              {done}/{total}
-            </Text>
-          </>
-        )}
+        {/* 개수는 옆 범례가 보여 주므로 가운데는 퍼센트만. 바뀌면 숫자가 굴러간다(글자 크기는 기본 size 140 기준) */}
+        <View className="flex-row items-end">
+          <RollingNumber value={pct} className="text-[30px] leading-[34px] font-bold tracking-[-1px]" />
+          <Text className="mb-[3px] font-semibold" style={{ fontSize: size * 0.107 }} maxFontSizeMultiplier={1.3}>
+            %
+          </Text>
+        </View>
       </View>
-
-      {celebrate && <CelebrationBurst size={size} />}
     </View>
   );
 }

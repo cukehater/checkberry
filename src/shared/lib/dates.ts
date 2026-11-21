@@ -42,6 +42,13 @@ export function weekStart(date: DateStr): DateStr {
   return addDays(date, -weekday(date));
 }
 
+/** 'N월 N주차'. 그 주(일~토) 목요일이 속한 달에서 몇 번째 목요일인지로 센다 */
+export function weekOfMonthLabel(date: DateStr): string {
+  const thu = addDays(weekStart(date), 4);
+  // 연도도 목요일 기준(2027-01-01이 속한 주는 2026년 12월 5주차)
+  return `${thu.slice(0, 4)}년 ${Number(thu.slice(5, 7))}월 ${Math.ceil(Number(thu.slice(8)) / 7)}주차`;
+}
+
 export function monthStart(date: DateStr): DateStr {
   return date.slice(0, 8) + '01';
 }
@@ -79,4 +86,16 @@ export function formatDateTime(iso: string, today: DateStr = todayStr()): string
   const t = new Date(iso);
   const h = t.getHours();
   return `${formatMD(toDateStr(t), today)} ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad(t.getMinutes())}`;
+}
+
+/** 지난 시각(ISO)을 '방금 전', 'N분 전', 'N시간 전', 'N일 전'(달력 날짜 기준)으로. 30일이 넘으면 날짜 */
+export function formatAgo(iso: string, now = new Date()): string {
+  const t = new Date(iso);
+  const min = Math.floor((now.getTime() - t.getTime()) / 60000);
+  const days = diffDays(toDateStr(t), toDateStr(now));
+  if (min < 1) return '방금 전';
+  if (min < 60) return `${min}분 전`;
+  if (days === 0) return `${Math.floor(min / 60)}시간 전`;
+  if (days <= 30) return `${days}일 전`;
+  return formatMD(toDateStr(t), toDateStr(now));
 }

@@ -49,4 +49,17 @@ export const haptic = {
   lift: () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
   /** 삭제 확정 */
   destructive: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
+  /** 습관 체크(눌러 채울 때) */
+  checkStrong: () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+  /** 체크 해제 */
+  uncheck: () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+  /** 체크로 오늘 항목이 100%가 된 순간. 묵직한 탁 뒤 80ms에 성공 알림 */
+  allDoneStrong: () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTimeout(() => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 80);
+  },
+  /** 연속 기록 이정표 */
+  milestone: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+  /** 입력 오류 흔들림 */
+  warning: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
 };

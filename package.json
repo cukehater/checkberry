@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@react-native-community/datetimepicker": "9.2.1",
+    "@marceloterreiro/flash-calendar": "^2.0.0",
+    "@shopify/flash-list": "2.3.2",
     "clsx": "^2.1.1",
     "expo": "~58.0.26",
     "expo-blur": "~58.0.6",
@@ -20,6 +21,7 @@
     "expo-status-bar": "~58.0.5",
     "expo-system-ui": "~58.0.7",
     "heroui-native": "^1.1.1",
+    "lottie-react-native": "~7.5.1",
     "papaparse": "^5.7.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "@feature-sliced/steiger-plugin": "^0.8.2",
+    "@gravity-ui/icons": "^2.23.1",
     "@types/jest": "30.0.0",
     "@types/papaparse": "^5.5.2",
     "@types/react": "~19.3.0",
@@ -66,7 +69,8 @@
     "verify": "expo lint && prettier --check . && steiger ./src && knip",
     "prepare": "husky",
     "knip": "knip",
-    "knip:fix": "knip --fix"
+    "knip:fix": "knip --fix",
+    "icons:gen": "node scripts/gen-gravity-icons.mjs && prettier --write src/shared/ui/gravity-icons.all.ts"
   },
   "private": true,
   "jest": {

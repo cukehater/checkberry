@@ -53,6 +53,9 @@ export function weekCount(doneDates: Set<DateStr>, date: DateStr): number {
 /** 연속 기록을 셀 마지막 날. 보관했으면 보관 전날 */
 const lastDay = (h: HabitLike, today: DateStr) => (h.archived_on && today >= h.archived_on ? addDays(h.archived_on, -1) : today);
 
+/** 연속 기록을 셀 때 읽는 기록 기간(일). 오늘·습관 탭이 같은 값을 써서 숫자가 어긋나지 않게 한다 */
+export const STREAK_LOOKBACK_DAYS = 400;
+
 /**
  * H-08 streak. 매일·요일 지정은 예정일 기준 연속 일수, 주 N회는 목표를 채운 연속 주 수.
  * - 오늘(이번 주)을 아직 못 채웠으면 끊지 않고 직전부터 센다
