@@ -27,7 +27,7 @@ export function TaskList({
   tasks: EventRow[];
   today: string;
   onToggle: (e: EventRow) => void;
-  /** 길게 누르면 편집. 없으면 보기·완료만 한다 */
+  /** 행을 누르면 편집. 없으면 보기·완료만 한다 */
   onOpen?: (e: EventRow) => void;
   empty?: string;
   highlight?: string;

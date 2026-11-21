@@ -1,4 +1,4 @@
-import { gwaWa, iGa } from '../josa';
+import { eulReul, gwaWa, iGa } from '../josa';
 
 describe('josa', () => {
   it('받침이 있으면 이·과, 없으면 가·와', () => {
@@ -8,6 +8,8 @@ describe('josa', () => {
     expect(iGa('불씨')).toBe('불씨가');
     expect(gwaWa('스트레칭')).toBe('스트레칭과');
     expect(gwaWa('독서')).toBe('독서와');
+    expect(eulReul('수하물 확인')).toBe('수하물 확인을');
+    expect(eulReul('장보기')).toBe('장보기를');
   });
 
   it('끝 따옴표는 건너뛰고, 한글이 아니면 받침 없음으로 본다', () => {

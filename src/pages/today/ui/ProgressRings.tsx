@@ -7,8 +7,9 @@ import { duration, easing, RollingNumber, Text, useColor } from '@/shared/ui';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// 모두 끝냈을 때 가운데 베리(Lottie 76)
+// 모두 끝냈을 때 가운데 베리. 안쪽 링 빈 원(지름 2 × (38 − 13/2) = 63) 안에 들어가는 크기
 const DONE_BERRY = require('../../../../assets/lottie/done-berry.json');
+const DONE_SIZE = 58;
 
 const VIEW = 128;
 const CENTER = 64;
@@ -54,9 +55,9 @@ export function ProgressRings({
 
   const h = useAnimatedRatio(habitsTotal ? habitsDone / habitsTotal : 0);
   const t = useAnimatedRatio(tasksTotal ? tasksDone / tasksTotal : 0);
-  // 0일 때 둥근 선끝이 점으로 남지 않게 숨긴다
-  const outerProps = useAnimatedProps(() => ({ strokeDashoffset: C_OUT * (1 - h.get()), strokeOpacity: h.get() > 0.001 ? 1 : 0 }));
-  const innerProps = useAnimatedProps(() => ({ strokeDashoffset: C_IN * (1 - t.get()), strokeOpacity: t.get() > 0.001 ? 1 : 0 }));
+  // 0 근처에서는 둥근 선끝이 점으로 남았다가 툭 사라지지 않게, 마지막 4% 동안 서서히 흐려진다
+  const outerProps = useAnimatedProps(() => ({ strokeDashoffset: C_OUT * (1 - h.get()), strokeOpacity: Math.min(1, h.get() / 0.04) }));
+  const innerProps = useAnimatedProps(() => ({ strokeDashoffset: C_IN * (1 - t.get()), strokeOpacity: Math.min(1, t.get() / 0.04) }));
 
   return (
     <View
@@ -67,15 +68,15 @@ export function ProgressRings({
       accessibilityValue={{ min: 0, max: 100, now: pct }}
     >
       <Svg width={size} height={size} viewBox={`0 0 ${VIEW} ${VIEW}`}>
-        <Circle cx={CENTER} cy={CENTER} r={R_OUT} fill="none" stroke={c.accentSoft} strokeWidth={STROKE} />
-        <Circle cx={CENTER} cy={CENTER} r={R_IN} fill="none" stroke={c.successSoft} strokeWidth={STROKE} />
+        <Circle cx={CENTER} cy={CENTER} r={R_OUT} fill="none" stroke={c.ringHabitSoft} strokeWidth={STROKE} />
+        <Circle cx={CENTER} cy={CENTER} r={R_IN} fill="none" stroke={c.ringTaskSoft} strokeWidth={STROKE} />
         <G rotation={-90} origin={`${CENTER}, ${CENTER}`}>
           <AnimatedCircle
             cx={CENTER}
             cy={CENTER}
             r={R_OUT}
             fill="none"
-            stroke={c.accent}
+            stroke={c.ringHabit}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={`${C_OUT} ${C_OUT}`}
@@ -86,7 +87,7 @@ export function ProgressRings({
             cy={CENTER}
             r={R_IN}
             fill="none"
-            stroke={c.success}
+            stroke={c.ringTask}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={`${C_IN} ${C_IN}`}
@@ -97,7 +98,13 @@ export function ProgressRings({
 
       <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
         {allDone ? (
-          <LottieView key={String(reduce)} source={DONE_BERRY} autoPlay={!reduce} loop={!reduce} style={{ width: 76, height: 76 }} />
+          <LottieView
+            key={String(reduce)}
+            source={DONE_BERRY}
+            autoPlay={!reduce}
+            loop={!reduce}
+            style={{ width: DONE_SIZE, height: DONE_SIZE }}
+          />
         ) : (
           // 개수는 옆 범례가 보여 주므로 가운데는 퍼센트만. 바뀌면 숫자가 굴러간다
           <View className="flex-row items-end">

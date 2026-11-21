@@ -6,6 +6,7 @@ export * from './DatePicker';
 export * from './dialog';
 export * from './GravityIcon';
 export * from './motion';
+export * from './PhosphorIcon';
 export * from './primitives';
 export * from './RollingNumber';
 export * from './sheet';

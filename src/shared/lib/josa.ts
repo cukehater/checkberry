@@ -7,5 +7,7 @@ function hasBatchim(word: string): boolean {
 
 /** 이/가 */
 export const iGa = (w: string) => `${w}${hasBatchim(w) ? '이' : '가'}`;
+/** 을/를 */
+export const eulReul = (w: string) => `${w}${hasBatchim(w) ? '을' : '를'}`;
 /** 과/와 */
 export const gwaWa = (w: string) => `${w}${hasBatchim(w) ? '과' : '와'}`;

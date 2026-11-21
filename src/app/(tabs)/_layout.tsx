@@ -2,9 +2,10 @@ import { type Href, Link, Redirect } from 'expo-router';
 import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { PixelRatio, Pressable, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSetting } from '@/shared/db';
 import { cn, useToday } from '@/shared/lib';
 import {
@@ -28,6 +29,10 @@ const TABS: { name: string; title: string; icon: IconName }[] = [
   { name: 'habits', title: '습관', icon: 'habits' },
   { name: 'calendar', title: '캘린더', icon: 'calendar' },
 ];
+
+// 헤더 버튼 줄(iOS 기본 44) 아래 바닥색 띠. 스크롤한 내용이 버튼 바로 밑에서 잘리지 않게 한다
+const HEADER_BAND = 12;
+const BAND_PAD = { paddingBottom: HEADER_BAND };
 
 // 화면을 좌우로 밀면 옆 탭으로 간다. 세로 스크롤이 먼저 움직이면(14pt) 가로 제스처는 포기한다
 const SWIPE_DISTANCE = 60;
@@ -135,6 +140,9 @@ export default function TabsLayout() {
   const db = useSQLiteContext();
   const c = useColor();
   const today = useToday();
+  const inset = useSafeAreaInsets().top;
+  // 기본 헤더와 같은 상태 바 높이(다이내믹 아일랜드 기기는 안전 영역보다 5pt 남짓 작게 잡는다, react-navigation getDefaultHeaderHeight)
+  const statusBar = inset > 50 ? inset - (5 + 1 / PixelRatio.get()) : inset;
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   useEffect(() => {
     getSetting(db, 'onboarded').then((v) => setOnboarded(v === '1'));
@@ -164,7 +172,11 @@ export default function TabsLayout() {
         return {
           // 탭을 옮길 때 방향에 맞춰 살짝 밀리며 바뀐다
           animation: 'shift',
-          headerStyle: { backgroundColor: c.bg },
+          // 띠만큼 헤더를 늘리고, 버튼 칸은 아래를 비워 버튼이 원래 줄(44) 가운데에 남게 한다
+          headerStyle: { backgroundColor: c.bg, height: statusBar + 44 + HEADER_BAND },
+          headerLeftContainerStyle: BAND_PAD,
+          headerRightContainerStyle: BAND_PAD,
+          headerTitleContainerStyle: BAND_PAD,
           headerTitleStyle: { color: c.text, fontWeight: '600', fontSize: 17 },
           headerShadowVisible: false,
           // 제목은 각 화면 본문의 큰 제목(LargeTitle)이 맡는다. 오늘 탭 왼쪽 위에는 앱 표식과 이름을 둔다

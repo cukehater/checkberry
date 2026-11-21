@@ -40,6 +40,7 @@ const ICONS = {
   repeat: ['arrows-rotate-right', 'arrows-rotate-right'],
   'arrow-up': ['arrow-up', 'arrow-up'],
   'arrow-down': ['arrow-down', 'arrow-down'],
+  equal: ['equal', 'equal'],
   search: ['magnifier', 'magnifier'],
   pencil: ['pencil', 'pencil'],
   book: ['book-open', 'book-open'],
@@ -83,12 +84,12 @@ export function useMotion(ms: number) {
 }
 
 /**
- * 탭 화면 머리. 헤더 툴바 아래 6pt에 큰 제목(34pt, 41 줄), 오른쪽에 accessory(순서 바꾸기·이번 주·월/주 세그먼트),
+ * 탭 화면 머리. 헤더(버튼 줄 + 12pt 바닥색 띠) 바로 아래에 큰 제목(34pt, 41 줄), 오른쪽에 accessory(순서 바꾸기·이번 주·월/주 세그먼트),
  * 그 아래 6pt에 메타 칩 줄(chips, 칩 사이 6), 첫 콘텐츠까지 16pt. 모든 탭이 같은 자리에 제목을 둔다
  */
 export function LargeTitle({ title, accessory, chips }: { title: string; accessory?: React.ReactNode; chips?: React.ReactNode }) {
   return (
-    <View className="mt-1.5 mb-4 gap-1.5">
+    <View className="mb-4 gap-1.5">
       <View className="min-h-[41px] flex-row items-center justify-between gap-3">
         {/* 큰 제목은 이미 크니 글자 크기 설정을 1.3배까지만 따른다 */}
         <Text
@@ -153,7 +154,7 @@ export function useTabBarInset() {
   return useTabBarBottom() + TAB_BAR_HEIGHT + 16;
 }
 
-/** 목록 묶음. 크림 바닥 위 흰 카드에 행을 담는다(행 사이는 Separator) */
+/** 목록 묶음. 크림 바닥 위 흰 카드에 행을 담는다(행 사이는 Separator). className은 안쪽 면에 붙으니 바깥 여백(m*)은 감싼 뷰에 준다 */
 export function ListGroup({ children, className }: { children: React.ReactNode; className?: string }) {
   const card = useCardStyle();
   return (
@@ -187,6 +188,7 @@ const LOZENGE = {
   success: 'bg-success-soft text-success-soft-foreground',
   warning: 'bg-warning-soft text-warning-soft-foreground',
   danger: 'bg-danger-soft text-danger-soft-foreground',
+  frost: 'bg-frost-soft text-frost-soft-foreground',
 } as const;
 
 /**
@@ -216,6 +218,7 @@ export function Lozenge({
     success: c.successInk,
     warning: c.warningInk,
     danger: c.dangerInk,
+    frost: c.frostInk,
   }[tone];
   return (
     <View
@@ -367,19 +370,16 @@ function SegmentLabel({ pos, index, label, size }: { pos: SharedValue<number>; i
  * 보기 전환(알약 세그먼트). 회색 알약 트랙(전체 폭, 안쪽 3pt) 위 흰 알약이 고른 칸이다.
  * 칸은 모두 같은 폭(36pt). 고르면 알약이 220ms 동안 미끄러져 가고 글자색이 함께 바뀐다(동작 줄이기면 즉시).
  * 글자는 15pt, 칸이 5개 이상이면 14pt(할 일 필터의 '날짜 없음'이 잘리지 않게).
- * value가 어느 칸에도 없으면 흰 알약을 그리지 않는다(할 일 시작일이 오늘·내일이 아닐 때 날짜 세그먼트).
- * captions는 트랙 아래 양끝 12pt 글자(중요도의 '낮음'·'매우 높음')
+ * value가 어느 칸에도 없으면 흰 알약을 그리지 않는다(할 일 시작일이 오늘·내일이 아닐 때 날짜 세그먼트)
  */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
-  captions,
 }: {
   options: readonly (readonly [T, string])[];
   value: T | null;
   onChange: (v: T) => void;
-  captions?: readonly [string, string];
 }) {
   const reduce = useReducedMotion();
   const found = options.findIndex(([v]) => v === value);
@@ -397,7 +397,7 @@ export function Segmented<T extends string>({
 
   const thumb = useAnimatedStyle(() => ({ width: cell, transform: [{ translateX: SEG_PAD + pos.get() * (cell + SEG_GAP) }] }));
 
-  const track = (
+  return (
     <View
       className="flex-row gap-0.5 self-stretch rounded-3xl bg-default p-[3px]"
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
@@ -421,16 +421,6 @@ export function Segmented<T extends string>({
       ))}
     </View>
   );
-  if (!captions) return track;
-  return (
-    <View className="gap-1.5">
-      {track}
-      <View className="flex-row justify-between px-2.5">
-        <Text className="text-[12px] leading-4 text-muted">{captions[0]}</Text>
-        <Text className="text-[12px] leading-4 text-muted">{captions[1]}</Text>
-      </View>
-    </View>
-  );
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -440,26 +430,9 @@ const TICK = 13;
 /**
  * 할 일 완료 체크. 24pt 둥근 사각. 빈 칸은 채움 없이 1.5pt border-strong 테두리(카드 대비 3:1 이상이라 누를 컨트롤로 보인다),
  * 완료하면 잎 초록으로 160ms 차오른 뒤 체크가 200ms 동안 그어진다. 누르면 0.92배로 눌렸다 돌아온다.
- * 칸 전체가 눌린다(기본 44pt). children을 주면 상자 옆 내용까지 한 영역으로 눌린다. onLongPress는 같은 영역의 길게 누르기
+ * 칸 전체가 눌린다(기본 44pt)
  */
-export function Check({
-  done,
-  onPress,
-  onLongPress,
-  label,
-  hint,
-  className,
-  children,
-}: {
-  done: boolean;
-  onPress: () => void;
-  onLongPress?: () => void;
-  label: string;
-  /** VoiceOver 힌트. 길게 누르기처럼 안 보이는 동작을 알린다 */
-  hint?: string;
-  className?: string;
-  children?: React.ReactNode;
-}) {
+export function Check({ done, onPress, label, className }: { done: boolean; onPress: () => void; label: string; className?: string }) {
   const c = useColor();
   const fillMs = useMotion(160);
   const drawMs = useMotion(200);
@@ -473,8 +446,8 @@ export function Check({
     tick.set(done ? withDelay(fillMs / 2, withTiming(1, { duration: drawMs, easing: EASE })) : 0);
   }, [done, fillMs, drawMs, p, tick]);
   const box = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(p.get(), [0, 1], [`${c.success}00`, c.success]),
-    borderColor: interpolateColor(p.get(), [0, 1], [c.borderStrong, c.success]),
+    backgroundColor: interpolateColor(p.get(), [0, 1], [`${c.task}00`, c.task]),
+    borderColor: interpolateColor(p.get(), [0, 1], [c.borderStrong, c.task]),
     transform: [{ scale: scale.get() }],
   }));
   // 0일 때 둥근 선끝이 점으로 남지 않게 숨긴다
@@ -482,20 +455,18 @@ export function Check({
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={onLongPress}
       onPressIn={() => scale.set(withTiming(0.92, { duration: pressMs, easing: EASE }))}
       onPressOut={() => scale.set(withTiming(1, { duration: fillMs, easing: EASE }))}
       className={cn('h-11 w-11 items-center justify-center', className)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: done }}
       accessibilityLabel={label}
-      accessibilityHint={hint}
     >
       <Animated.View className="h-6 w-6 items-center justify-center rounded-lg border-[1.5px]" style={box}>
         <Svg width={21} height={21} viewBox="0 0 20 20" style={{ position: 'absolute' }}>
           <AnimatedPath
             d="M5.5 10.5 L8.7 13.7 L14.5 7"
-            stroke={c.onAccent}
+            stroke={c.onTask}
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -505,7 +476,6 @@ export function Check({
           />
         </Svg>
       </Animated.View>
-      {children}
     </Pressable>
   );
 }
@@ -549,26 +519,11 @@ export function FormScreen({ header, children }: { header?: React.ReactNode; chi
   );
 }
 
-/** 폼 필드 묶음. 14 SemiBold 머리글 아래 내용. value는 머리글 오른쪽 끝 값(중요도 '보통') */
-export function Section({
-  title,
-  value,
-  children,
-  className,
-}: {
-  title?: string;
-  value?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+/** 폼 필드 묶음. 14 SemiBold 머리글 아래 내용 */
+export function Section({ title, children, className }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
     <View className={cn('gap-2', className)}>
-      {title && (
-        <View className="flex-row items-baseline justify-between px-1">
-          <Text className="text-[14px] leading-5 font-semibold">{title}</Text>
-          {value && <Text className="text-[14px] leading-5 font-medium text-muted">{value}</Text>}
-        </View>
-      )}
+      {title && <Text className="px-1 text-[14px] leading-5 font-semibold">{title}</Text>}
       {children}
     </View>
   );
@@ -633,7 +588,7 @@ export function EmptyState({
   const c = useColor();
   const reduce = useReducedMotion();
   const habit = action?.tone === 'habit';
-  const ink = habit ? c.accentInk : c.successInk;
+  const ink = habit ? c.accentInk : c.taskInk;
   return (
     <ListGroup className="items-center px-6 py-6">
       <LottieView key={String(reduce)} source={EMPTY_ART[art]} autoPlay={!reduce} loop={!reduce} style={{ width: 112, height: 112 }} />
@@ -646,12 +601,12 @@ export function EmptyState({
           onPress={action.onPress}
           className={cn(
             'mt-4 h-11 flex-row items-center gap-1.5 rounded-full px-4 active:opacity-80',
-            habit ? 'bg-accent-soft' : 'bg-success-soft',
+            habit ? 'bg-accent-soft' : 'bg-task-soft',
           )}
           accessibilityRole="button"
         >
           <Icon name="plus" size={16} tint={ink} />
-          <Text className={cn('text-[15px] font-semibold', habit ? 'text-accent-soft-foreground' : 'text-success-soft-foreground')}>
+          <Text className={cn('text-[15px] font-semibold', habit ? 'text-accent-soft-foreground' : 'text-task-soft-foreground')}>
             {action.label}
           </Text>
         </Pressable>
@@ -716,6 +671,42 @@ export function ActionButton({
     >
       {icon && <Icon name={icon} size={16} tint={ink} />}
       <Text className={cn('font-semibold', size === 'lg' ? 'text-[17px]' : 'text-[16px]', text)}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * 켜고 끄는 스위치. 트랙 51×31 안 27pt 정원 손잡이(iOS 26 기본 Switch는 손잡이가 가로로 긴 알약이라 직접 그린다).
+ * 켜짐은 베리, 꺼짐은 track. 손잡이는 220ms 동안 미끄러지고 동작 줄이기면 바로 옮겨 간다
+ */
+export function Toggle({
+  value,
+  onValueChange,
+  accessibilityLabel,
+}: {
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  accessibilityLabel: string;
+}) {
+  const c = useColor();
+  const reduce = useReducedMotion();
+  const p = useSharedValue(value ? 1 : 0);
+  useEffect(() => {
+    p.set(reduce ? (value ? 1 : 0) : withTiming(value ? 1 : 0, { duration: duration.collapse, easing: easing.standard }));
+  }, [value, reduce, p]);
+  const track = useAnimatedStyle(() => ({ backgroundColor: interpolateColor(p.get(), [0, 1], [c.track, c.accent]) }));
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: p.get() * 20 }] }));
+  return (
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      hitSlop={8}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View className="h-[31px] w-[51px] justify-center rounded-full p-0.5" style={track}>
+        <Animated.View className="h-[27px] w-[27px] rounded-full bg-white" style={[THUMB_SHADOW, thumb]} />
+      </Animated.View>
     </Pressable>
   );
 }

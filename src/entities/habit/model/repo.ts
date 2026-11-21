@@ -113,3 +113,40 @@ export async function softDeleteHabit(db: SQLiteDatabase, id: string) {
 export async function restoreHabit(db: SQLiteDatabase, id: string) {
   await db.runAsync('UPDATE habits SET deleted_at = NULL, updated_at = ? WHERE id = ?', nowIso(), id);
 }
+
+type HabitLogRow = { id: string; habit_id: string; log_date: DateStr; is_done: number; created_at: string; updated_at: string };
+
+/**
+ * 시작일을 뒤로 옮길 때: 습관을 저장하고 새 시작일보다 앞선 기록을 한 트랜잭션에서 지운다.
+ * restore()는 지운 기록과 이전 시작일을 함께 되돌린다(실행취소)
+ */
+export async function saveHabitTrimmingLogs(db: SQLiteDatabase, id: string, h: HabitInput, previousStart: DateStr) {
+  let removed: HabitLogRow[] = [];
+  await db.withTransactionAsync(async () => {
+    await saveHabit(db, id, h);
+    removed = await db.getAllAsync<HabitLogRow>(
+      'SELECT id, habit_id, log_date, is_done, created_at, updated_at FROM habit_logs WHERE habit_id = ? AND log_date < ?',
+      id,
+      h.start_date,
+    );
+    await db.runAsync('DELETE FROM habit_logs WHERE habit_id = ? AND log_date < ?', id, h.start_date);
+  });
+  return {
+    removed: removed.length,
+    restore: () =>
+      db.withTransactionAsync(async () => {
+        for (const l of removed) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO habit_logs (id, habit_id, log_date, is_done, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            l.id,
+            l.habit_id,
+            l.log_date,
+            l.is_done,
+            l.created_at,
+            l.updated_at,
+          );
+        }
+        await db.runAsync('UPDATE habits SET start_date = ?, updated_at = ? WHERE id = ?', previousStart, nowIso(), id);
+      }),
+  };
+}

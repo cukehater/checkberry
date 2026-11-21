@@ -1,10 +1,22 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
-import { createGroup, EVENT_SQL, type EventRow, type Group, type Repeat, restoreEvent, saveEvent, softDeleteEvent } from '@/entities/event';
+import { View } from 'react-native';
+import {
+  createGroup,
+  EVENT_SQL,
+  type EventRow,
+  type Group,
+  PRIORITY_NAME,
+  PRIORITY_VALUE,
+  priorityOf,
+  type Repeat,
+  restoreEvent,
+  saveEvent,
+  softDeleteEvent,
+} from '@/entities/event';
 import { useQuery } from '@/shared/db';
-import { addDays, fieldErrors, formatDateTime, formatMD, iGa, useFocusAfterTransition, useToday } from '@/shared/lib';
+import { addDays, fieldErrors, formatDateTime, eulReul, formatMD, useFocusAfterTransition, useToday } from '@/shared/lib';
 import {
   ActionButton,
   confirm,
@@ -19,6 +31,7 @@ import {
   showToast,
   showUndo,
   Text,
+  Toggle,
   useCardStyle,
   useColor,
   useSheetGuard,
@@ -37,14 +50,8 @@ const QUICK = [
   ['today', '오늘'],
   ['tomorrow', '내일'],
 ] as const;
-const PRIORITIES = [
-  ['1', '1'],
-  ['2', '2'],
-  ['3', '3'],
-  ['4', '4'],
-  ['5', '5'],
-] as const;
-const PRIORITY_NAME = ['', '매우 낮음', '낮음', '보통', '높음', '매우 높음'];
+// 중요도 3단계. 저장 값 1·3·5
+const PRIORITIES = (['low', 'normal', 'high'] as const).map((p) => [String(PRIORITY_VALUE[p]), PRIORITY_NAME[p]] as const);
 
 // S07 일정·할 일 편집 시트. 날짜를 비우면 '날짜 없는 할 일'(E-01)
 export function EventPage() {
@@ -80,7 +87,8 @@ export function EventPage() {
       setTitle(e.title);
       setStart(e.start_date ?? '');
       setEnd(e.end_date && e.end_date !== e.start_date ? e.end_date : '');
-      setPriority(e.priority);
+      // 예전 5단계 값(2·4)은 가까운 단계로 맞춘다
+      setPriority(PRIORITY_VALUE[priorityOf(e.priority)]);
       setGroupId(e.group_id);
       setDescription(e.description ?? '');
       setCompleted(!!e.completed_at);
@@ -128,8 +136,8 @@ export function EventPage() {
   const remove = () => {
     if (!ev) return;
     confirm({
-      title: '할 일을 삭제할까요?',
-      message: `${iGa(`‘${ev.title}’`)} 목록에서 지워져요.`,
+      title: `${eulReul(ev.title)} 삭제할까요?`,
+      message: '목록에서 지워져요.',
       confirmLabel: '삭제',
       destructive: true,
     }).then(async (ok) => {
@@ -206,13 +214,8 @@ export function EventPage() {
       )}
 
       {/* FR-10: 중요도·그룹·메모는 처음부터 보인다 */}
-      <Section title="중요도" value={PRIORITY_NAME[priority]}>
-        <Segmented
-          options={PRIORITIES}
-          value={String(priority)}
-          onChange={(v) => setPriority(Number(v))}
-          captions={['낮음', '매우 높음']}
-        />
+      <Section title="중요도">
+        <Segmented options={PRIORITIES} value={String(priority)} onChange={(v) => setPriority(Number(v))} />
       </Section>
 
       <Section title="그룹">
@@ -259,14 +262,7 @@ export function EventPage() {
               </Text>
             )}
           </View>
-          {/* RN Switch는 부모의 items-center를 따르지 않고 행 위에 붙어서(iOS 26+) 직접 가운데로 둔다 */}
-          <Switch
-            value={completed}
-            onValueChange={setCompleted}
-            trackColor={{ true: c.accent }}
-            accessibilityLabel="완료"
-            className="self-center"
-          />
+          <Toggle value={completed} onValueChange={setCompleted} accessibilityLabel="완료" />
         </View>
       )}
 

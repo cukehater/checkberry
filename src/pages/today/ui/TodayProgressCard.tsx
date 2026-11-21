@@ -103,8 +103,8 @@ export function TodayProgressCard({
             allDone={allDone}
           />
           <View className="min-w-0 flex-1 gap-4">
-            <LegendRow color={c.accent} soft={c.accentSoft} label="습관" done={habitsDone} total={habitsTotal} />
-            <LegendRow color={c.success} soft={c.successSoft} label="할 일" done={tasksDone} total={tasksTotal} />
+            <LegendRow color={c.ringHabit} soft={c.ringHabitSoft} label="습관" done={habitsDone} total={habitsTotal} />
+            <LegendRow color={c.ringTask} soft={c.ringTaskSoft} label="할 일" done={tasksDone} total={tasksTotal} />
           </View>
         </View>
       </Surface>

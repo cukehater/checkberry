@@ -1,4 +1,4 @@
-import { compareTasks, dday, earlyCompletion, matchesFilter, nextOccurrence, weekBars } from '../tasks';
+import { compareTasks, dday, earlyCompletion, matchesFilter, nextOccurrence, priorityOf } from '../tasks';
 
 describe('dday (E-08)', () => {
   const today = '2026-11-18';
@@ -81,28 +81,8 @@ describe('earlyCompletion (FR-03)', () => {
   });
 });
 
-describe('weekBars (캘린더 이어진 막대)', () => {
-  const t = (id: string, start: string, end: string | null = null) => ({
-    id,
-    start_date: start,
-    end_date: end,
-    completed_at: null,
-    priority: 3,
-    sort_order: 0,
-  });
-  const week = '2026-11-15'; // 일요일
-  test('주 경계에서 잘라 시작·끝 칸을 정한다', () => {
-    const [bar] = weekBars([t('a', '2026-11-12', '2026-11-17')], week);
-    expect(bar).toMatchObject({ startCol: 0, endCol: 2, lane: 0 });
-  });
-  test('겹치는 할 일은 다른 줄, 안 겹치면 같은 줄을 쓴다', () => {
-    const bars = weekBars([t('long', '2026-11-16', '2026-11-19'), t('mid', '2026-11-18'), t('late', '2026-11-20')], week);
-    const lane = (id: string) => bars.find((b) => b.task.id === id)!.lane;
-    expect(lane('long')).toBe(0);
-    expect(lane('mid')).toBe(1);
-    expect(lane('late')).toBe(0);
-  });
-  test('주 밖이거나 날짜 없는 할 일은 빠진다', () => {
-    expect(weekBars([t('x', '2026-11-25'), { ...t('y', '2026-11-16'), start_date: null }], week)).toEqual([]);
+describe('priorityOf (중요도 3단계)', () => {
+  test('3 미만은 낮음, 3은 보통, 3 초과는 높음(예전 5단계 값 포함)', () => {
+    expect([1, 2, 3, 4, 5].map(priorityOf)).toEqual(['low', 'low', 'normal', 'high', 'high']);
   });
 });

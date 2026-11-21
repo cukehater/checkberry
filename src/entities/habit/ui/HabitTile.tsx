@@ -94,7 +94,8 @@ export function HabitTile({
   }, [done, reduce, fill, pop, bump]);
 
   const circleStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(fill.get(), [0, 1], [c.accentSoft, c.accent]),
+    // 아직: 습관 원 색, 완료: 베리. 주간 목표 달성(weekDone)은 베리 soft + 베리 테두리로 달성을 말한다
+    backgroundColor: interpolateColor(fill.get(), [0, 1], [state === 'weekDone' ? c.accentSoft : c.habitBg, c.accent]),
     transform: [{ scale: pop.get() }],
   }));
   const metaStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.get() }] }));
@@ -137,7 +138,7 @@ export function HabitTile({
             ) : state === 'weekDone' ? (
               <CheckGlyph size={18} color={c.accentInk} />
             ) : (
-              <HabitIcon iconKey={iconKey} size={18} tint={c.accentInk} />
+              <HabitIcon iconKey={iconKey} size={18} tint={c.habitInk} />
             )}
           </Animated.View>
           {burst > 0 && (

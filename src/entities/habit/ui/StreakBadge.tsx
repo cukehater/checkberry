@@ -96,7 +96,8 @@ export function StreakBadge({
         <StreakArt count={count} unit={unit} size={28} playKey={playKey} />
       </View>
       <RollingNumber value={count} className={cn('text-[15px] leading-[18px] font-bold', text)} />
-      <Text className={cn('ml-0.5 text-[12px] leading-[18px] font-semibold', text)}>{unit}</Text>
+      {/* 숫자는 tabular-nums라 '1'도 넓게 잡혀서 단위를 바로 붙인다 */}
+      <Text className={cn('text-[12px] leading-[18px] font-semibold', text)}>{unit}</Text>
     </View>
   );
 }

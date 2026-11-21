@@ -20,7 +20,7 @@ function revealIcon(d: number, w: number) {
   };
 }
 
-type Action = { icon: IconName; label: string; tone: 'accent' | 'danger' | 'neutral'; onAction: () => void };
+type Action = { icon: IconName; label: string; tone: 'accent' | 'task' | 'danger' | 'neutral'; onAction: () => void };
 
 /**
  * 끌어서 실행하는 행(Mail·Things식 전체 스와이프). 오른쪽으로 끌면 right, 왼쪽으로 끌면 left 동작.
@@ -79,7 +79,9 @@ export function SwipeRow({
   const leftIcon = useAnimatedStyle(() => revealIcon(-x.get(), width.get()));
   const rightBg = useAnimatedStyle(() => ({ opacity: x.get() > 1 ? 1 : 0 }));
   const leftBg = useAnimatedStyle(() => ({ opacity: x.get() < -1 ? 1 : 0 }));
-  const toneColor = (t: Action['tone']) => (t === 'danger' ? c.danger : t === 'neutral' ? c.sub : c.accent);
+  const toneColor = (t: Action['tone']) => (t === 'danger' ? c.danger : t === 'neutral' ? c.sub : t === 'task' ? c.task : c.accent);
+  // 면 위 아이콘색. 다크의 포인트·할 일 면은 밝아서 어두운 글자색을 쓴다
+  const toneInk = (t: Action['tone']) => (t === 'task' ? c.onTask : t === 'accent' ? c.onAccent : c.onDanger);
 
   const actions = [right, left].filter((a): a is Action => !!a);
   return (
@@ -90,10 +92,14 @@ export function SwipeRow({
       onAccessibilityAction={(e) => actions.find((a) => a.label === e.nativeEvent.actionName)?.onAction()}
     >
       {right && (
-        // 동작 색 면은 끄는 쪽에 따라 하나만 보인다. 색은 동작마다 계산되는 값이라 style로 준다
-        <Animated.View className="absolute inset-0 justify-center pl-6" style={[{ backgroundColor: toneColor(right.tone) }, rightBg]}>
+        // 동작 색 면은 끄는 쪽에 따라 하나만 보인다. 색은 동작마다 계산되는 값이라 style로 준다.
+        // items-start로 아이콘 칸을 아이콘 크기로 둔다(늘어나면 1.2배로 커질 때 행 가운데 기준으로 커져 아이콘이 밀린다)
+        <Animated.View
+          className="absolute inset-0 items-start justify-center pl-6"
+          style={[{ backgroundColor: toneColor(right.tone) }, rightBg]}
+        >
           <Animated.View style={rightIcon}>
-            <Icon name={right.icon} size={22} tint={c.onAccent} />
+            <Icon name={right.icon} size={22} tint={toneInk(right.tone)} />
           </Animated.View>
         </Animated.View>
       )}
@@ -103,7 +109,7 @@ export function SwipeRow({
           style={[{ backgroundColor: toneColor(left.tone) }, leftBg]}
         >
           <Animated.View style={leftIcon}>
-            <Icon name={left.icon} size={22} tint={c.onAccent} />
+            <Icon name={left.icon} size={22} tint={toneInk(left.tone)} />
           </Animated.View>
         </Animated.View>
       )}

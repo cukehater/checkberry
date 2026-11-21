@@ -127,13 +127,13 @@ export function TodayPage() {
     hold(e.id);
     toggleTask(db, e, today);
   };
-  const quickAdd = (title: string) =>
+  const quickAdd = (title: string, priority: number) =>
     saveEvent(db, null, {
       title,
       description: null,
       start_date: today,
       end_date: today,
-      priority: 3,
+      priority,
       group_id: null,
       completed: false,
       rrule: null,
@@ -219,34 +219,37 @@ export function TodayPage() {
             finishing={finishing}
           />
 
-          <ListGroup className="mt-3 pb-4">
-            <ListHeader inCard title="습관" count={habits.length ? `${habitCount.done}/${habitCount.total}` : undefined} />
-            {habits.length === 0 ? (
-              <View className="min-h-[44px] flex-row items-center justify-between">
-                <Text className="text-[15px] text-muted">오늘 할 습관이 없어요.</Text>
-                {textLink('습관 추가', () => router.push('/habits/new'))}
-              </View>
-            ) : (
-              // 누르면 체크, 길게 누르면 편집. 오른쪽 연속 기록 메달, 주 N회는 이번 주 진행 캡션
-              <View className="gap-2">
-                {habits.map((h) => {
-                  const day = dayOf(h);
-                  return (
-                    <HabitTile
-                      key={h.id}
-                      name={h.name}
-                      iconKey={h.icon_key}
-                      state={habitDayState(day)}
-                      caption={day.weekly && weeklyCaption(day.weekly)}
-                      streak={{ count: streak(h, doneByHabit.get(h.id) ?? new Set<string>(), today).current, unit: streakUnit(h) }}
-                      onToggle={() => check(h)}
-                      onLongPress={() => edit(h.id)}
-                    />
-                  );
-                })}
-              </View>
-            )}
-          </ListGroup>
+          {/* 바깥 여백은 감싼 뷰에 준다. ListGroup의 className은 안쪽 면에 붙어 다크의 바깥 윤곽선 안에 여백이 생긴다 */}
+          <View className="mt-3">
+            <ListGroup className="pb-4">
+              <ListHeader inCard title="습관" count={habits.length ? `${habitCount.done}/${habitCount.total}` : undefined} />
+              {habits.length === 0 ? (
+                <View className="min-h-[44px] flex-row items-center justify-between">
+                  <Text className="text-[15px] text-muted">오늘 할 습관이 없어요.</Text>
+                  {textLink('습관 추가', () => router.push('/habits/new'))}
+                </View>
+              ) : (
+                // 누르면 체크, 길게 누르면 편집. 오른쪽 연속 기록 메달, 주 N회는 이번 주 진행 캡션
+                <View className="gap-2">
+                  {habits.map((h) => {
+                    const day = dayOf(h);
+                    return (
+                      <HabitTile
+                        key={h.id}
+                        name={h.name}
+                        iconKey={h.icon_key}
+                        state={habitDayState(day)}
+                        caption={day.weekly && weeklyCaption(day.weekly)}
+                        streak={{ count: streak(h, doneByHabit.get(h.id) ?? new Set<string>(), today).current, unit: streakUnit(h) }}
+                        onToggle={() => check(h)}
+                        onLongPress={() => edit(h.id)}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+            </ListGroup>
+          </View>
         </>
       )}
 

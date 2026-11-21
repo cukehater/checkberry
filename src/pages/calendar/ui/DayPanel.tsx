@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
@@ -144,6 +145,7 @@ export function DayPanel({
             tasks={tasks}
             today={today}
             onToggle={(e) => toggleTask(db, e, today)}
+            onOpen={(e) => router.push({ pathname: '/event', params: { id: e.id } })}
             empty="이날은 할 일이 없어요."
           />
         </Animated.View>

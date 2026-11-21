@@ -11,8 +11,9 @@ import { useColor, useOverlayShadow } from './theme';
 // 시트(네이티브 모달) 위에서도 보여야 해서 DialogHost를 루트와 시트 화면(FormScreen) 양쪽에 두고, 가장 나중에 열린 화면의 Host만 그린다
 type Action = { label: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void };
 // 동작 메뉴의 목록 행(아이콘 + 글자). destructive면 오류 글자색
-type MenuItem = { icon: IconName; label: string; destructive?: boolean; onPress: () => void };
-type Dialog = { title: string; message?: string; hint?: string; actions: Action[]; menu?: MenuItem[] };
+// tint는 아이콘색(중요도 화살표처럼 항목마다 다른 색)
+type MenuItem = { icon: IconName; label: string; destructive?: boolean; tint?: string; onPress: () => void };
+type Dialog = { title: string; message?: string; hint?: string; actions: Action[]; menu?: MenuItem[]; menuRow?: boolean };
 
 let current: Dialog | null = null;
 let hosts: string[] = [];
@@ -48,10 +49,10 @@ export function confirm(o: {
 
 /**
  * 동작 메뉴(그룹 메뉴 등): 제목 + 부제 + 목록 행(52pt) + 전체 폭 취소. 채운 버튼이 없어 삭제 확인처럼 보이지 않는다.
- * 삭제 같은 행은 고른 뒤 confirm()으로 한 번 더 묻는다
+ * 삭제 같은 행은 고른 뒤 confirm()으로 한 번 더 묻는다. row면 항목을 한 줄에 같은 폭 버튼으로 나란히 둔다(중요도처럼 고르는 값이 몇 개일 때)
  */
-export function showMenu(o: { title: string; subtitle?: string; items: MenuItem[] }) {
-  showDialog({ title: o.title, message: o.subtitle, menu: o.items, actions: [{ label: '취소', style: 'cancel' }] });
+export function showMenu(o: { title: string; subtitle?: string; items: MenuItem[]; row?: boolean }) {
+  showDialog({ title: o.title, message: o.subtitle, menu: o.items, menuRow: o.row, actions: [{ label: '취소', style: 'cancel' }] });
 }
 
 /** 확인 버튼 하나짜리 안내 */
@@ -122,9 +123,24 @@ export function DialogHost() {
           {dialog.hint && <Text className="mt-1 text-[14px] leading-5 text-muted">{dialog.hint}</Text>}
           {dialog.menu ? (
             <>
-              <View className="mt-2.5">
+              <View className={dialog.menuRow ? 'mt-4 flex-row gap-2' : 'mt-2.5'}>
                 {dialog.menu.map((m, i) => {
-                  const tint = m.destructive ? c.dangerInk : c.text;
+                  const tint = m.tint ?? (m.destructive ? c.dangerInk : c.text);
+                  if (dialog.menuRow)
+                    return (
+                      <Pressable
+                        key={m.label}
+                        onPress={() => {
+                          close();
+                          m.onPress();
+                        }}
+                        className="h-[72px] flex-1 items-center justify-center gap-1.5 rounded-2xl bg-default active:opacity-70"
+                        accessibilityRole="button"
+                      >
+                        <Icon name={m.icon} size={20} tint={tint} />
+                        <Text className="text-[15px] font-semibold">{m.label}</Text>
+                      </Pressable>
+                    );
                   return (
                     <Pressable
                       key={m.label}
@@ -143,7 +159,8 @@ export function DialogHost() {
               </View>
               <Pressable
                 onPress={() => close(cancel)}
-                className="mt-3 h-11 items-center justify-center rounded-full bg-default active:opacity-70"
+                // 고르는 버튼(회색 면)과 구분되게 취소는 테두리만
+                className="mt-3 h-11 items-center justify-center rounded-full border border-border-strong active:opacity-70"
                 accessibilityRole="button"
               >
                 <Text className="text-[15px] font-semibold text-default-foreground">취소</Text>

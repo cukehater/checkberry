@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { normalizeHabitIcons } from '@/entities/habit';
 import { nowIso, setSetting } from '@/shared/db';
 import { formatDateTime, todayStr } from '@/shared/lib';
 import { confirm, notify } from '@/shared/ui';
@@ -48,6 +49,8 @@ export async function pickAndRestore(db: SQLiteDatabase): Promise<boolean> {
   if (!ok) return false;
   try {
     await restoreBackup(db, backup);
+    // 예전 백업의 습관 아이콘 값(옛 키·Gravity)을 Phosphor로 옮긴다
+    await normalizeHabitIcons(db);
     // 다른 기기 백업에 온보딩 값이 없어도 복원했으면 온보딩은 끝난 것
     await setSetting(db, 'onboarded', '1');
     return true;
@@ -59,7 +62,7 @@ export async function pickAndRestore(db: SQLiteDatabase): Promise<boolean> {
 
 export async function exportTasksCsv(db: SQLiteDatabase) {
   const rows = await db.getAllAsync<Record<string, unknown>>(
-    `SELECT e.title AS 제목, e.start_date AS 시작일, e.end_date AS 종료일, e.priority AS 중요도,
+    `SELECT e.title AS 제목, e.start_date AS 시작일, e.end_date AS 종료일, CASE WHEN e.priority < 3 THEN '낮음' WHEN e.priority > 3 THEN '높음' ELSE '보통' END AS 중요도,
        CASE WHEN e.completed_at IS NULL THEN 'No' ELSE 'Yes' END AS 완료, g.name AS 그룹, e.description AS 내용
      FROM events e LEFT JOIN task_groups g ON g.id = e.group_id
      WHERE e.deleted_at IS NULL ORDER BY e.start_date, e.sort_order`,

@@ -8,6 +8,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { normalizeHabitIcons } from '@/entities/habit';
 import { loadTheme } from '@/features/theme';
 import { DB_NAME, migrate } from '@/shared/db';
 import { BrandSplash, DialogHost, ToastHost, UndoBar, useColor } from '@/shared/ui';
@@ -16,6 +17,8 @@ import { BrandSplash, DialogHost, ToastHost, UndoBar, useColor } from '@/shared/
 // (안에 두면 다크 모드 전환 때 DB가 다시 열리며 'Access to closed resource'가 나고 앱 상태가 초기화된다)
 const initDb = async (db: SQLiteDatabase) => {
   await migrate(db);
+  // 옛 습관 아이콘 값(옛 키·Gravity)을 Phosphor로 옮긴다. 이미 옮겼으면 바로 끝난다
+  await normalizeHabitIcons(db);
   await loadTheme(db);
 };
 

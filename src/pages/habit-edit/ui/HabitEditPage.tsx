@@ -8,10 +8,11 @@ import {
   type HabitLog,
   habitRate30,
   HabitTile,
-  iconLabel,
+  ICON_PREFIX,
   parseWeekdays,
   restoreHabit,
   saveHabit,
+  saveHabitTrimmingLogs,
   setHabitArchived,
   softDeleteHabit,
   STAGE_NAME,
@@ -62,7 +63,7 @@ export function HabitEditPage({ id }: { id?: string }) {
   const nameRef = useFocusAfterTransition(!id);
   const [habit, setHabit] = useState<Habit | null>(null);
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState<string>('check');
+  const [icon, setIcon] = useState<string>(`${ICON_PREFIX}sparkle`);
   const [startDate, setStartDate] = useState(today);
   const [frequency, setFrequency] = useState<Frequency>('daily');
   const [weekdays, setWeekdays] = useState<number[]>([]);
@@ -119,7 +120,7 @@ export function HabitEditPage({ id }: { id?: string }) {
       if (!errors.name) showToast({ message: first, tone: 'error' });
       return;
     }
-    await saveHabit(db, id ?? null, {
+    const input = {
       name: trimmed,
       icon_key: icon,
       icon_manual: true,
@@ -127,7 +128,23 @@ export function HabitEditPage({ id }: { id?: string }) {
       frequency_type: frequency,
       weekdays: frequency === 'weekdays' ? [...weekdays].sort().join(',') : null,
       weekly_target: frequency === 'weekly' ? weeklyTarget : null,
-    });
+    };
+    // 시작일을 뒤로 옮겨 그 전 체크 기록이 남게 되면, 확인을 받고 지운다(5초 실행취소)
+    const before = habit ? logs.filter((l) => l.log_date < startDate).length : 0;
+    if (habit && before > 0) {
+      const ok = await confirm({
+        title: '시작일 이전 기록을 지울까요?',
+        message: `${before}개의 체크 기록이 지워져요.`,
+        confirmLabel: '지우기',
+        destructive: true,
+      });
+      if (!ok) return;
+      const { restore } = await saveHabitTrimmingLogs(db, habit.id, input, habit.start_date);
+      close();
+      showUndo('시작일 이전 기록을 지웠어요', restore);
+      return;
+    }
+    await saveHabit(db, id ?? null, input);
     close();
   };
 
@@ -190,14 +207,17 @@ export function HabitEditPage({ id }: { id?: string }) {
         </ListGroup>
       ) : (
         // 추가: 오늘 탭에 놓일 실제 타일 모양 그대로(키보드가 올라와도 아래 필드가 보이게 작게)
-        <ListGroup className="px-3 py-3">
-          <HabitTile
-            name={trimmed || '습관 이름'}
-            iconKey={icon}
-            state="todo"
-            accessory={<Text className="text-[12px] text-muted">오늘 탭에 이렇게 보여요</Text>}
-          />
-        </ListGroup>
+        // 화면 읽기 프로그램에는 체크 상자가 아니라 미리보기 한 덩어리로 읽힌다
+        <View accessible accessibilityLabel={`미리보기, ${trimmed || '습관 이름'}. 오늘 탭에 이렇게 보여요`}>
+          <ListGroup className="px-3 py-3">
+            <HabitTile
+              name={trimmed || '습관 이름'}
+              iconKey={icon}
+              state="todo"
+              accessory={<Text className="text-[12px] text-muted">오늘 탭에 이렇게 보여요</Text>}
+            />
+          </ListGroup>
+        </View>
       )}
 
       <Section title="이름">
@@ -219,13 +239,10 @@ export function HabitEditPage({ id }: { id?: string }) {
         className="h-14 flex-row items-center gap-3 rounded-[20px] bg-card px-4 active:opacity-70"
         style={card}
         accessibilityRole="button"
-        accessibilityLabel={`아이콘 고르기, 지금 ${iconLabel(icon)}`}
+        accessibilityLabel="아이콘 고르기"
       >
         <HabitChip iconKey={icon} size={32} />
         <Text className="flex-1 text-[16px] font-medium">아이콘 고르기</Text>
-        <Text className="max-w-[45%] text-[15px] text-muted" numberOfLines={1}>
-          {iconLabel(icon)}
-        </Text>
         <Icon name="chevron-right" size={14} tint={c.sub} />
       </Pressable>
       <IconPicker visible={picking} value={icon} onPick={setIcon} onClose={() => setPicking(false)} />

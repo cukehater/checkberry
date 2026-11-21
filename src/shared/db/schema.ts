@@ -80,6 +80,10 @@ const MIGRATIONS = [
   ALTER TABLE events ADD COLUMN planned_start TEXT;
   ALTER TABLE events ADD COLUMN planned_end TEXT;
   `,
+  // 중요도 5단계 → 3단계(낮음 1·보통 3·높음 5). 2는 낮음, 4는 높음으로 옮긴다
+  `
+  UPDATE events SET priority = CASE WHEN priority < 3 THEN 1 WHEN priority > 3 THEN 5 ELSE 3 END WHERE priority NOT IN (1, 3, 5);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

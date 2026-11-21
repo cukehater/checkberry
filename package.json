@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@feature-sliced/steiger-plugin": "^0.8.2",
-    "@gravity-ui/icons": "^2.23.1",
+    "@phosphor-icons/core": "^2.1.1",
     "@types/jest": "30.0.0",
     "@types/papaparse": "^5.5.2",
     "@types/react": "~19.3.0",
@@ -70,7 +70,7 @@
     "prepare": "husky",
     "knip": "knip",
     "knip:fix": "knip --fix",
-    "icons:gen": "node scripts/gen-gravity-icons.mjs && prettier --write src/shared/ui/gravity-icons.all.ts"
+    "icons:gen": "node scripts/gen-phosphor-icons.mjs"
   },
   "private": true,
   "jest": {

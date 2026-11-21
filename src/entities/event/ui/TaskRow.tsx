@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { type ComponentRef, useEffect, useRef, useState } from 'react';
-import { ScrollView, type TextLayoutEvent, View } from 'react-native';
+import { Pressable, ScrollView, type TextLayoutEvent, View } from 'react-native';
 import Animated, {
   FadeOut,
   interpolateColor,
@@ -16,14 +16,18 @@ import Animated, {
 import { cn, formatMD } from '@/shared/lib';
 import { Check, duration, EASE, easing, Icon, Lozenge, SwipeRow, Text, useColor, useMotion } from '@/shared/ui';
 import type { EventRow } from '../model/repo';
-import { dday } from '../model/tasks';
+import { dday, PRIORITY_NAME, priorityOf } from '../model/tasks';
 import { removeTask } from './toggleTask';
 
 type TextLayoutLine = TextLayoutEvent['nativeEvent']['lines'][number];
 
 const REPEAT_LABEL = { daily: '매일', weekly: '매주', monthly: '매월' } as const;
-// 목록에서는 높음 이상만 보여 준다
-const PRIORITY_LABEL: Record<number, string> = { 4: '높음', 5: '매우 높음' };
+// 중요도 배지(지라식 화살표): 높음 ↑ 베리, 보통 = 호박, 낮음 ↓ 서리(파랑). 벽돌은 지연 전용이라 쓰지 않는다
+const PRIORITY_BADGE = {
+  high: { tone: 'accent', icon: 'arrow-up' },
+  normal: { tone: 'warning', icon: 'equal' },
+  low: { tone: 'frost', icon: 'arrow-down' },
+} as const;
 
 export type ScrollRef = React.RefObject<ComponentRef<typeof ScrollView> | null>;
 
@@ -88,7 +92,7 @@ export function TaskRow({
   today: string;
   context?: RowContext;
   onToggle: () => void;
-  /** 길게 누르면 편집. 없으면 보기·완료만 하는 목록 */
+  /** 행(체크 상자 밖)을 누르면 편집 */
   onPress?: () => void;
   right?: React.ReactNode;
   className?: string;
@@ -135,20 +139,25 @@ export function TaskRow({
     (task.end_date && task.end_date !== task.start_date
       ? `${formatMD(task.start_date, today)} – ${formatMD(task.end_date, today)}`
       : formatMD(task.start_date, today));
-  const priority = PRIORITY_LABEL[task.priority];
+  const level = priorityOf(task.priority);
+  const badge = PRIORITY_BADGE[level];
   return (
     <Animated.View layout={LAYOUT} exiting={EXIT}>
-      {/* 왼쪽으로 끌면 삭제(확인 후). 카드 안쪽 여백(16)까지 차도록 -mx-4 */}
-      <SwipeRow className="-mx-4" left={{ icon: 'trash', label: '삭제', tone: 'danger', onAction: () => removeTask(db, task) }}>
-        <Animated.View ref={ref} className={cn('min-h-12 flex-row items-center px-4', className)} style={glowStyle}>
-          {/* FR-05: 행을 누르면 완료 토글, 길게 누르면 편집 */}
-          <Check
-            done={done}
-            onPress={onToggle}
-            onLongPress={onPress}
-            label={`${task.title} 완료`}
-            hint={onPress ? '길게 누르면 편집해요' : undefined}
-            className="-ml-3 h-auto min-h-12 flex-1 flex-row items-start justify-start gap-3.5 self-stretch py-3 pl-3"
+      {/* 오른쪽으로 끌면 완료 토글(햅틱은 toggleTask), 왼쪽으로 끌면 삭제(확인 후). 카드 안쪽 여백(16)까지 차도록 -mx-4 */}
+      <SwipeRow
+        className="-mx-4"
+        right={{ icon: 'check', label: done ? '완료 해제' : '완료', tone: 'task', onAction: onToggle }}
+        left={{ icon: 'trash', label: '삭제', tone: 'danger', onAction: () => removeTask(db, task) }}
+      >
+        <Animated.View ref={ref} className={cn('min-h-12 flex-row items-start px-4', className)} style={glowStyle}>
+          {/* 체크 상자(44pt)를 누르면 완료 토글, 나머지를 누르면 편집 */}
+          <Check done={done} onPress={onToggle} label={`${task.title} 완료`} className="-ml-3 h-12 w-11 pl-1" />
+          <Pressable
+            onPress={onPress}
+            disabled={!onPress}
+            className="min-h-12 flex-1 flex-row items-start gap-3.5 py-3 pl-1.5"
+            accessibilityRole={onPress ? 'button' : undefined}
+            accessibilityHint={onPress ? '편집해요' : undefined}
           >
             <Animated.View className="flex-1" style={bodyStyle}>
               <View>
@@ -181,12 +190,12 @@ export function TaskRow({
               )}
             </Animated.View>
             {/* 제목 첫 줄 높이(22)에 맞춘 중요도 로젠지 */}
-            {!done && priority && (
+            {!done && (
               <View>
-                <Lozenge label={priority} tone="warning" />
+                <Lozenge label={PRIORITY_NAME[level]} tone={badge.tone} icon={badge.icon} />
               </View>
             )}
-          </Check>
+          </Pressable>
           {right}
         </Animated.View>
       </SwipeRow>

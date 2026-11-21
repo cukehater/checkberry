@@ -16,6 +16,15 @@ export function dday(
   return { label: `D+${-diffDays(today, due)}`, overdue: true };
 }
 
+/**
+ * 중요도 3단계. 저장 값은 1(낮음)·3(보통)·5(높음)이고, 예전 5단계 값(2·4)이나 옛 백업도 범위로 읽는다.
+ * 정렬은 값 그대로 내림차순이라 바뀌지 않는다
+ */
+export type Priority = 'low' | 'normal' | 'high';
+export const PRIORITY_VALUE: Record<Priority, number> = { low: 1, normal: 3, high: 5 };
+export const PRIORITY_NAME: Record<Priority, string> = { low: '낮음', normal: '보통', high: '높음' };
+export const priorityOf = (value: number): Priority => (value < 3 ? 'low' : value > 3 ? 'high' : 'normal');
+
 export type TaskLike = {
   start_date: DateStr | null;
   end_date: DateStr | null;
@@ -67,32 +76,6 @@ export function matchesFilter(task: TaskLike, filter: TaskFilter, today: DateStr
     case 'overdue':
       return !task.completed_at && !!task.start_date && (task.end_date ?? task.start_date) < today;
   }
-}
-
-export type WeekBar<T> = { task: T; startCol: number; endCol: number; lane: number };
-
-/**
- * 캘린더 한 주(일~토)에 걸친 할 일을 이어진 막대로 배치한다. 막대는 주 안에서 시작·끝 칸을 갖고,
- * 겹치지 않는 가장 위 줄(lane)에 놓인다. 일찍 시작하고 긴 할 일이 위쪽 줄을 먼저 차지해 여러 날 막대가 끊기지 않는다
- */
-export function weekBars<T extends TaskLike>(tasks: T[], weekStart: DateStr): WeekBar<T>[] {
-  const weekEnd = addDays(weekStart, 6);
-  const lanes: boolean[][] = [];
-  return tasks
-    .filter((t) => overlaps(t, weekStart, weekEnd))
-    .map((t) => ({
-      task: t,
-      startCol: Math.max(0, diffDays(weekStart, t.start_date!)),
-      endCol: Math.min(6, diffDays(weekStart, t.end_date ?? t.start_date!)),
-    }))
-    .sort((a, b) => a.startCol - b.startCol || b.endCol - a.endCol || compareTasks(a.task, b.task))
-    .map((bar) => {
-      let lane = 0;
-      while (lanes[lane]?.slice(bar.startCol, bar.endCol + 1).some(Boolean)) lane++;
-      lanes[lane] ??= Array(7).fill(false);
-      for (let c = bar.startCol; c <= bar.endCol; c++) lanes[lane][c] = true;
-      return { ...bar, lane };
-    });
 }
 
 /** 날짜 범위 [from, to]와 겹치는지 */

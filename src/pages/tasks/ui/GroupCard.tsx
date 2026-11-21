@@ -66,8 +66,9 @@ export function GroupCard({
         accessibilityElementsHidden={!open}
         importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
       >
+        {/* 내용은 부모 높이와 떨어뜨려(absolute) 잰다. 흐름 안에 두면 접히는 동안 0으로 재져서 다시 펼칠 높이를 잃는다 */}
         <View
-          className="px-4"
+          className="absolute top-0 right-0 left-0 px-4"
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
             measured.set(measured.get() < 0 || reduce ? h : withTiming(h, TIMING));
