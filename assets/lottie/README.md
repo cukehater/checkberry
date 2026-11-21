@@ -1,15 +1,16 @@
 # Lottie 에셋
 
-## flame.json
+Claude Design 핸드오프(2026-11-21, 디테일 다듬기)에서 받은 파일이다. 모두 128×128, 30fps, 2초 반복이고 그라디언트만 쓴다(효과·마스크 없음).
 
-- 원본: "Flame - Streak" by Noah Wise — https://lottiefiles.com/free-animation/flame-streak-Y3x3T9TqFh
-- 작가 프로필: https://lottiefiles.com/39f6am8gemmf9vs0
-- 라이선스: Lottie Simple License (https://lottiefiles.com/page/license). 상업적 사용과 수정이 허용되고, 수정본(이 파일)도 같은 라이선스를 따른다. 출처 표기는 필수가 아니라 권장이다.
-- 내려받은 파일: https://assets-v2.lottiefiles.com/a/a87616ae-84de-11ee-9595-0bf0b4b8de5e/dz9tZLVoRx.lottie (dotLottie 압축을 풀어 JSON을 꺼냄, 2026-11-21)
+| 파일                         | 쓰는 곳                                  |
+| ---------------------------- | ---------------------------------------- |
+| `streak-1-ice.json`          | 연속 기록 1단계(얼음), 습관 탭 빈 상태   |
+| `streak-2-drop.json`         | 연속 기록 2단계(물방울)                  |
+| `streak-3-ember.json`        | 연속 기록 3단계(불씨)                    |
+| `streak-4-flame.json`        | 연속 기록 4단계(불꽃)                    |
+| `streak-5-blaze.json`        | 연속 기록 5단계(활활)                    |
+| `done-berry.json`            | 오늘 진행 카드, 모두 끝냈을 때 링 가운데 |
+| `empty-today-sprout.json`    | 오늘 탭 빈 상태                          |
+| `empty-tasks-clipboard.json` | 할 일 탭 빈 상태                         |
 
-원본에서 바꾼 것:
-
-- 레이어 이름 `base Outlines` 등을 `base`, `outer`, `dark`, `light`로 줄였다. `StreakBadge`의 `colorFilters` keypath(`outer`, `base`)가 이 이름을 쓴다.
-- 0~10프레임(커졌다 줄어드는 등장)을 잘라 `ip`를 10으로 했다. 반복할 때 튀지 않는다.
-- 300×436 캔버스를 불꽃 중심 320×320 정사각으로 잘랐다(투명 null 부모 레이어 `crop`으로 이동).
-- 채움색: 바깥 불꽃 `#F04A3A`, 안쪽 불꽃·불티 `#FDB43C`, 불티 하나 `#E11D48`(베리). 원본은 노랑 두 톤.
+같은 그림의 정지 SVG 원본은 `design/checkberry-handoff/assets/svg/`에 있다(저장소에는 넣지 않는다).

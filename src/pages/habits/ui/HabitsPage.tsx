@@ -20,21 +20,25 @@ import {
   type HabitLog,
   isScheduled,
   streak,
+  StreakArt,
   STREAK_LOOKBACK_DAYS,
   StreakBadge,
+  streakUnit,
   toggleHabitLog,
+  weeklyCaption,
 } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
 import { addDays, cn, formatKo, formatMD, useToday, WEEKDAY_KO, weekOfMonthLabel, weekStart } from '@/shared/lib';
 import {
   duration,
   easing,
+  EmptyState,
   haptic,
   Icon,
-  IconButton,
   LargeTitle,
   ListGroup,
   Lozenge,
+  PeriodNav,
   RollingNumber,
   spring,
   Text,
@@ -98,38 +102,52 @@ export function HabitsPage() {
       <View className="px-1">
         <LargeTitle
           title="습관"
+          chips={
+            activeCount > 0 && (
+              <>
+                <Lozenge size="lg" label={`${activeCount}개 진행 중`} />
+                {bestStreak > 0 && (
+                  // 최고 연속의 단계 그림(정지)을 칩 앞에
+                  <Lozenge size="lg" label={`최고 연속 ${bestStreak}일`} leading={<StreakArt count={bestStreak} unit="일" size={22} />} />
+                )}
+              </>
+            )
+          }
           accessory={
-            !thisWeek && (
+            !thisWeek &&
+            allHabits.length > 0 && (
               <Pressable
                 onPress={() => setStart(weekStart(today))}
-                hitSlop={8}
-                className="min-h-9 justify-center active:opacity-60"
+                hitSlop={4}
+                className="h-9 justify-center rounded-full bg-default px-3.5 active:opacity-60"
                 accessibilityRole="button"
               >
-                <Text className="text-[15px] font-semibold text-accent">이번 주</Text>
+                <Text className="text-[14px] font-semibold">이번 주</Text>
               </Pressable>
             )
           }
         />
-        {activeCount > 0 && (
-          <View className="-mt-2 mb-4 flex-row gap-1.5">
-            <Lozenge label={`${activeCount}개 진행 중`} />
-            {bestStreak > 0 && <Lozenge tone="warning" icon="habits" label={`최고 연속 ${bestStreak}일`} />}
-          </View>
-        )}
       </View>
 
-      <View className="-mx-0.5 flex-row items-center justify-between">
-        <IconButton name="chevron-left" size={16} onPress={() => setStart(addDays(start, -7))} accessibilityLabel="이전 주" />
-        {/* 주차만 보인다. 날짜 범위는 화면 읽기 프로그램이 함께 읽는다 */}
-        <Text
-          className="text-[22px] leading-7 font-bold tracking-[-0.4px] tabular-nums"
-          accessibilityLabel={`${weekOfMonthLabel(start)}, ${formatMD(days[0], today)}부터 ${formatMD(days[6], today)}까지`}
-        >
-          {weekOfMonthLabel(start)}
-        </Text>
-        <IconButton name="chevron-right" size={16} onPress={() => setStart(addDays(start, 7))} accessibilityLabel="다음 주" />
-      </View>
+      {allHabits.length === 0 ? (
+        // 습관이 아예 없으면 기간 이동을 숨기고, 1단계 얼음으로 연속 기록 규칙을 미리 보여 준다
+        <EmptyState
+          art="habits"
+          title="아직 습관이 없어요"
+          body={'습관을 만들어 이어 가면\n얼음이 녹고 불꽃이 커져요.'}
+          action={{ label: '습관 추가', tone: 'habit', onPress: () => router.push('/habits/new') }}
+        />
+      ) : (
+        // 주차만 보인다. 날짜 범위는 화면 읽기 프로그램이 함께 읽는다
+        <PeriodNav
+          label={weekOfMonthLabel(start)}
+          readLabel={`${weekOfMonthLabel(start)}, ${formatMD(days[0], today)}부터 ${formatMD(days[6], today)}까지`}
+          onPrev={() => setStart(addDays(start, -7))}
+          onNext={() => setStart(addDays(start, 7))}
+          prevLabel="이전 주"
+          nextLabel="다음 주"
+        />
+      )}
 
       {weekRate != null && (
         <WeekSummary
@@ -140,22 +158,6 @@ export function HabitsPage() {
         />
       )}
 
-      {/* 습관이 아예 없을 때만 만들기를 권한다. 만들기 전이나 보관 뒤의 주는 그 주에 없었다고만 말한다 */}
-      {allHabits.length === 0 && (
-        <ListGroup className="items-center gap-2 py-12">
-          <Text className="text-[17px] font-semibold">아직 습관이 없어요</Text>
-          <Text className="text-center text-[15px] text-muted">매일, 원하는 요일, 주 몇 회처럼{'\n'}주기를 골라 만들어 보세요.</Text>
-          <Pressable
-            onPress={() => router.push('/habits/new')}
-            hitSlop={8}
-            className="mt-2 min-h-11 justify-center active:opacity-60"
-            accessibilityRole="button"
-          >
-            <Text className="text-[15px] font-semibold text-accent">습관 추가</Text>
-          </Pressable>
-        </ListGroup>
-      )}
-
       {allHabits.length > 0 && habits.length === 0 && (
         <ListGroup className="items-center py-8">
           <Text className="text-[15px] text-muted">이 주에는 예정된 습관이 없어요.</Text>
@@ -164,14 +166,14 @@ export function HabitsPage() {
 
       {habits.length > 0 && (
         <ListGroup className="px-3 pt-3 pb-1.5">
-          {/* 요일·날짜는 카드 맨 위에 한 번만. 아래 칸들은 이 열에 맞춰 선다. 오늘은 베리 채움, 일요일은 빨강 */}
+          {/* 요일·날짜는 카드 맨 위에 한 번만. 아래 칸들은 이 열에 맞춰 선다. 오늘은 베리 채움(벽돌색은 지연에만 쓰니 일요일도 같은 색) */}
           <View className="flex-row gap-1 pb-1.5">
             {days.map((d, i) => {
               const isToday = d === today;
-              const tone = isToday ? 'text-accent-foreground' : i === 0 ? 'text-danger-soft-foreground' : undefined;
+              const tone = isToday ? 'text-accent-foreground' : undefined;
               return (
-                <View key={d} className={cn('flex-1 items-center gap-0.5 rounded-[14px] py-1.5', isToday && 'bg-accent')}>
-                  <Text className={cn('text-[11px] leading-[13px] font-semibold', tone ?? 'text-muted')}>{WEEKDAY_KO[i]}</Text>
+                <View key={d} className={cn('flex-1 items-center gap-0.5 rounded-xl py-1.5', isToday && 'bg-accent')}>
+                  <Text className={cn('text-[12px] leading-[14px] font-semibold', tone ?? 'text-muted')}>{WEEKDAY_KO[i]}</Text>
                   <Text className={cn('text-[16px] leading-5 tabular-nums', isToday ? 'font-bold' : 'font-medium', tone)}>
                     {Number(d.slice(8))}
                   </Text>
@@ -193,13 +195,20 @@ export function HabitsPage() {
                   accessibilityLabel={`${h.name} 편집`}
                 >
                   <HabitChip iconKey={h.icon_key} size={32} />
-                  <Text className="flex-1 text-[16px] leading-[22px] font-medium" numberOfLines={1}>
-                    {h.name}
-                  </Text>
+                  <View className="flex-1">
+                    <Text className="text-[16px] leading-[22px] font-medium" numberOfLines={1}>
+                      {h.name}
+                    </Text>
+                    {/* 주 N회는 점 대신 '이번 주 3/3 완료' */}
+                    {weekly && (
+                      <Text className="text-[13px] leading-[18px] font-medium text-muted">
+                        {weeklyCaption({ done: doneCount, target })}
+                      </Text>
+                    )}
+                  </View>
                   {h.archived_on && <Lozenge label="보관" />}
-                  {weekly && <TargetDots done={doneCount} target={target} />}
-                  {/* 0일이어도 꺼진 재로 자리를 지켜 행마다 오른쪽 끝이 맞는다 */}
-                  <StreakBadge count={current} unit={weekly ? '주' : '일'} size="md" />
+                  {/* 흰 카드 위라 메달 원 바탕은 card */}
+                  <StreakBadge count={current} unit={streakUnit(h)} surface="card" />
                 </Pressable>
                 <View className="flex-row gap-1">
                   {days.map((d) => {
@@ -274,20 +283,6 @@ function Cell({ children, onPress, ...rest }: CellProps) {
     >
       <Animated.View style={style}>{children}</Animated.View>
     </Pressable>
-  );
-}
-
-// 주 N회 진행: 목표 개수만큼 점, 한 만큼 베리로 찬다. 목표를 채우면 잎색
-function TargetDots({ done, target }: { done: number; target: number }) {
-  return (
-    <View className="flex-row gap-1" accessible accessibilityLabel={`이번 주 ${done}/${target}회`}>
-      {Array.from({ length: target }, (_, i) => (
-        <View
-          key={i}
-          className={cn('h-[7px] w-[7px] rounded-full', i >= done ? 'bg-track' : done >= target ? 'bg-success' : 'bg-accent')}
-        />
-      ))}
-    </View>
   );
 }
 

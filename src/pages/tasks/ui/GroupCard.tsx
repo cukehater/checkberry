@@ -49,8 +49,8 @@ export function GroupCard({
           <Text className="text-[18px] leading-6 font-semibold tracking-[-0.2px]" accessibilityRole="header">
             {title}
           </Text>
-          <View className="min-h-[22px] min-w-[22px] items-center justify-center rounded-full bg-default px-2">
-            <RollingNumber value={count} className="text-[12px] font-semibold text-default-foreground" />
+          <View className="min-h-6 min-w-7 items-center justify-center rounded-full bg-default px-2">
+            <RollingNumber value={count} className="text-[13px] font-semibold text-default-foreground" />
           </View>
           <View className="flex-1" />
           <Animated.View style={chevronStyle}>

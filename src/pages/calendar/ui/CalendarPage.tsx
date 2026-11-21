@@ -1,6 +1,6 @@
 import { useNavigation } from 'expo-router';
 import type { BottomTabNavigationProp } from 'expo-router/js-tabs';
-import { type ComponentRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
@@ -31,31 +31,19 @@ import {
   weekOfMonthLabel,
   weekStart,
 } from '@/shared/lib';
-import {
-  CARD_SHADOW,
-  CHIP_EDGE,
-  CHIP_GAP,
-  duration as motion,
-  easing,
-  IconButton,
-  Segmented,
-  spring,
-  Text,
-  useColor,
-  useTabBarInset,
-} from '@/shared/ui';
+import { duration as motion, easing, LargeTitle, PeriodNav, Segmented, spring, Text, useCardStyle, useTabBarInset } from '@/shared/ui';
 import { DayPanel, DURATION } from './DayPanel';
 
 const MAX_LANES = 2;
-// 행 위 여백 4 + 숫자 칸 32 + 간격 3 아래부터 막대(18)를 3pt 간격으로 쌓는다
-const BAR_TOP = 39;
-const BAR_HEIGHT = 18;
-const LANE_HEIGHT = 21;
-// 주 행 높이(위 4·아래 6 여백 포함). 접히면 날짜 숫자 칸(40)만 남는다
+// 숫자 원(위 6 + 28) 아래 2pt부터 막대(20)를 2pt 간격으로 두 줄, 그 아래 '+n'
+const BAR_TOP = 36;
+const BAR_HEIGHT = 20;
+const LANE_HEIGHT = 22;
+// 주 행 높이. 접히면 날짜 숫자 칸(40)만 남는다
 const ROW_COMPACT = 50;
-const ROW_MONTH = 101;
-// 주 보기는 막대 12줄 + '+n' 줄까지 들어가는 높이
-const ROW_WEEK = BAR_TOP + 12 * LANE_HEIGHT + 20;
+const ROW_MONTH = 84;
+// 주 보기는 날마다 블록(최대 4줄)을 위에서부터 쌓는 높이
+const ROW_WEEK = 360;
 const VIEWS = [
   ['month', '월'],
   ['week', '주'],
@@ -71,9 +59,20 @@ const POP = new Keyframe({
   .duration(160)
   .reduceMotion(ReduceMotion.System);
 
+// 캘린더 막대·블록 색: 할 일은 잎(soft 바탕 + ink 글자), 지연은 벽돌, 완료는 회색 + 취소선
+type ItemTone = 'task' | 'late' | 'done';
+const itemTone = (e: EventRow, today: DateStr): ItemTone =>
+  e.completed_at ? 'done' : (e.end_date ?? e.start_date)! < today ? 'late' : 'task';
+const TONE_BG: Record<ItemTone, string> = { task: 'bg-success-soft', late: 'bg-danger-soft', done: 'bg-default' };
+const TONE_TEXT: Record<ItemTone, string> = {
+  task: 'text-success-soft-foreground',
+  late: 'text-danger-soft-foreground',
+  done: 'text-muted line-through',
+};
+
 // S02 캘린더: 월간(E-04) / 주간(E-05). 주 시작은 일요일
 export function CalendarPage() {
-  const c = useColor();
+  const card = useCardStyle();
   const today = useToday();
   const [view, setView] = useState<'month' | 'week'>('month');
   const [anchor, setAnchor] = useState<DateStr>(today);
@@ -110,23 +109,6 @@ export function CalendarPage() {
       }),
     [navigation, open, today],
   );
-  // 월/주 전환은 헤더 왼쪽(+·설정과 같은 줄)에 둔다. 헤더는 탭 레이아웃이 그리므로 이 화면 옵션으로 덮어쓴다
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <View className="w-[132px] pl-4">
-          <Segmented
-            options={VIEWS}
-            value={view}
-            onChange={(v) => {
-              if (open) setClosing(true);
-              setView(v);
-            }}
-          />
-        </View>
-      ),
-    });
-  }, [navigation, view, open]);
   const tabBarInset = useTabBarInset();
 
   // 달력 접기·펼치기: 패널과 같은 시간·곡선으로 동시에 움직인다(1 = 펼침). 동작 줄이기면 즉시 바뀐다
@@ -138,6 +120,10 @@ export function CalendarPage() {
     progress.set(withTiming(expanded ? 1 : 0, { duration }));
   }, [expanded, duration, progress]);
   const rowFull = view === 'month' ? ROW_MONTH : ROW_WEEK;
+  const changeView = (v: 'month' | 'week') => {
+    if (open) setClosing(true);
+    setView(v);
+  };
   const rowStyle = useAnimatedStyle(() => ({ height: interpolate(progress.get(), [0, 1], [ROW_COMPACT, rowFull]) }));
   // 막대와 '+n'은 접힐 때 앞 40% 동안 사라지고, 펼칠 때 뒤 40% 동안 나타난다
   const barStyle = useAnimatedStyle(() => ({ opacity: interpolate(progress.get(), [0.6, 1], [0, 1], Extrapolation.CLAMP) }));
@@ -154,7 +140,7 @@ export function CalendarPage() {
   };
   const [y, m] = anchor.split('-').map(Number);
   // 주 보기는 'N월 N주차'(목요일 기준, 습관 탭과 같은 표기)
-  const title = view === 'month' ? `${y}년 ${m}월` : weekOfMonthLabel(first);
+  const period = view === 'month' ? `${y}년 ${m}월` : weekOfMonthLabel(first);
 
   // 달력 카드를 좌우로 밀면 손가락을 따라 움직이고, 넘기면 밀어낸 쪽으로 나간 뒤 새 달이 반대쪽에서 들어온다.
   // 세로로 먼저 움직이면(14pt) 스크롤에 양보한다
@@ -204,45 +190,38 @@ export function CalendarPage() {
 
   return (
     <View className="flex-1 bg-background">
-      {/* 이전/다음 칩은 헤더 +·설정 칩과 같은 간격(CHIP_GAP)과 가장자리(CHIP_EDGE). IconButton은 44 영역 안 40 칩이라 2pt씩 뺀다 */}
-      <View className="mt-3 mb-3 flex-row items-center gap-1 pl-4" style={{ paddingRight: CHIP_EDGE - 2 }}>
-        <Text
-          // 주 보기 제목('2026년 11월 3주차')은 길어서 한 단계 작게
-          className={cn(
-            'flex-1 pl-1 font-bold',
-            view === 'month' ? 'text-[28px] leading-[34px] tracking-[-0.6px]' : 'text-[22px] leading-7 tracking-[-0.4px]',
-          )}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-          accessibilityRole="header"
-          maxFontSizeMultiplier={1.3}
-        >
-          {title}
-        </Text>
-        {!days.includes(today) && (
-          <Pressable
-            onPress={() => (close(), setAnchor(today))}
-            hitSlop={4}
-            className="mr-1 h-9 justify-center rounded-full bg-accent-soft px-3.5 active:opacity-60"
-            accessibilityRole="button"
-            accessibilityLabel={view === 'month' ? '이번 달로' : '이번 주로'}
-          >
-            <Text className="text-[14px] font-semibold text-accent-soft-foreground">오늘</Text>
-          </Pressable>
-        )}
-        <View className="flex-row" style={{ gap: CHIP_GAP - 4 }}>
-          <IconButton
-            name="chevron-left"
-            size={16}
-            onPress={() => move(-1)}
-            accessibilityLabel={view === 'month' ? '이전 달' : '이전 주'}
+      {/* 제목은 다른 탭처럼 '캘린더' 34pt, 오른쪽에 월/주 세그먼트(보이는 기간에 오늘이 없으면 '오늘' 알약), 아래에 기간 이동 줄 */}
+      <View className="mb-3 px-4">
+        <View className="px-1">
+          <LargeTitle
+            title="캘린더"
+            accessory={
+              <View className="flex-row items-center gap-2">
+                {!days.includes(today) && (
+                  <Pressable
+                    onPress={() => (close(), setAnchor(today))}
+                    hitSlop={4}
+                    className="h-9 justify-center rounded-full bg-default px-3.5 active:opacity-60"
+                    accessibilityRole="button"
+                    accessibilityLabel={view === 'month' ? '이번 달로' : '이번 주로'}
+                  >
+                    <Text className="text-[14px] font-semibold">오늘</Text>
+                  </Pressable>
+                )}
+                <View className="w-[120px]">
+                  <Segmented options={VIEWS} value={view} onChange={changeView} />
+                </View>
+              </View>
+            }
           />
-          <IconButton
-            name="chevron-right"
-            size={16}
-            onPress={() => move(1)}
-            accessibilityLabel={view === 'month' ? '다음 달' : '다음 주'}
+        </View>
+        <View className="-mt-1">
+          <PeriodNav
+            label={period}
+            onPrev={() => move(-1)}
+            onNext={() => move(1)}
+            prevLabel={view === 'month' ? '이전 달' : '이전 주'}
+            nextLabel={view === 'month' ? '다음 달' : '다음 주'}
           />
         </View>
       </View>
@@ -256,13 +235,11 @@ export function CalendarPage() {
       >
         {/* 달력은 좌우 여백 없이 칸을 채워야 해서 ListGroup 대신 같은 카드 모양을 직접 그린다 */}
         <GestureDetector gesture={pan}>
-          <Animated.View className="mx-4 rounded-3xl bg-card px-2 pt-2 pb-1.5" style={[c.raised ? CARD_SHADOW : undefined, pageStyle]}>
-            <View className="h-6 flex-row items-center">
-              {WEEKDAY_KO.map((w, i) => (
-                <Text
-                  key={w}
-                  className={cn('flex-1 text-center text-[12px] font-semibold', i === 0 ? 'text-danger-soft-foreground' : 'text-muted')}
-                >
+          <Animated.View className="mx-4 rounded-3xl bg-card px-2 pt-2 pb-1.5" style={[card, pageStyle]}>
+            {/* 요일 머리. 벽돌색은 지연에만 쓰니 일요일도 같은 색 */}
+            <View className="h-[26px] flex-row items-center">
+              {WEEKDAY_KO.map((w) => (
+                <Text key={w} className="flex-1 text-center text-[12px] font-semibold text-muted">
                   {w}
                 </Text>
               ))}
@@ -271,8 +248,8 @@ export function CalendarPage() {
             {Array.from({ length: weeks }, (_, wi) => {
               const weekDays = days.slice(wi * 7, wi * 7 + 7);
               // 여러 날 할 일은 주 안에서 한 줄 막대로 잇는다. 줄 수를 넘는 막대는 날짜별 '+n'으로 센다
-              const bars = weekBars(events, weekDays[0]);
-              const maxLanes = view === 'month' ? MAX_LANES : 12;
+              const bars = view === 'month' ? weekBars(events, weekDays[0]) : [];
+              const maxLanes = MAX_LANES;
               return (
                 <Animated.View
                   key={wi}
@@ -295,7 +272,7 @@ export function CalendarPage() {
                         accessibilityLabel={`${formatKo(d)}, 할 일 ${onDay(d).length}개`}
                         accessibilityHint={isSelected ? '다시 누르면 패널을 닫아요' : undefined}
                       >
-                        {/* 고른 날은 베리 원(튀며 나타남), 오늘은 옅은 베리 원. 일요일 숫자는 빨강 */}
+                        {/* 고른 날은 베리 원(튀며 나타남), 오늘은 옅은 베리 원 */}
                         <View
                           className={cn(
                             'h-7 w-7 items-center justify-center self-center rounded-full',
@@ -306,19 +283,33 @@ export function CalendarPage() {
                           <Text
                             className={cn(
                               'text-[14px] font-medium tabular-nums',
-                              isSelected
-                                ? 'font-bold text-accent-foreground'
-                                : isToday
-                                  ? 'font-bold text-accent-soft-foreground'
-                                  : col === 0 && 'text-danger-soft-foreground',
+                              isSelected ? 'font-bold text-accent-foreground' : isToday && 'font-bold text-accent-soft-foreground',
                             )}
                           >
                             {Number(d.slice(8))}
                           </Text>
                         </View>
                         {hidden > 0 && (
-                          <Animated.View className="absolute right-0 bottom-1.5 left-0" style={barStyle}>
-                            <Text className="text-center text-[11px] leading-[14px] font-semibold text-muted">+{hidden}</Text>
+                          <Animated.View className="absolute right-0 bottom-0 left-0" style={barStyle}>
+                            <Text className="text-center text-[12px] leading-[14px] font-semibold text-muted">+{hidden}</Text>
+                          </Animated.View>
+                        )}
+                        {view === 'week' && (
+                          // 주 보기: 남는 세로 공간에 그날 할 일 블록을 쌓는다(최대 4줄, 어절 단위 줄바꿈)
+                          <Animated.View className="mt-1.5 gap-1 px-px" style={barStyle}>
+                            {onDay(d).map((e) => {
+                              const tone = itemTone(e, today);
+                              return (
+                                <View key={e.id} className={cn('rounded-lg px-[3px] py-[5px]', TONE_BG[tone])}>
+                                  <Text
+                                    numberOfLines={4}
+                                    className={cn('text-center text-[12px] leading-[15px] font-semibold', TONE_TEXT[tone])}
+                                  >
+                                    {e.title}
+                                  </Text>
+                                </View>
+                              );
+                            })}
                           </Animated.View>
                         )}
                       </Pressable>
@@ -335,8 +326,7 @@ export function CalendarPage() {
                     {bars
                       .filter((b) => b.lane < maxLanes)
                       .map(({ task: e, startCol, endCol, lane }) => {
-                        const done = !!e.completed_at;
-                        const late = !done && (e.end_date ?? e.start_date)! < today;
+                        const tone = itemTone(e, today);
                         // 이 주에서 시작·끝나는 쪽만 둥글게 해서 주를 넘어 이어지는 막대처럼 보이게 한다
                         const starts = e.start_date! >= weekDays[0];
                         const ends = (e.end_date ?? e.start_date)! <= weekDays[6];
@@ -356,19 +346,13 @@ export function CalendarPage() {
                           >
                             <View
                               className={cn(
-                                'flex-1 justify-center px-1.5',
-                                done ? 'bg-default' : late ? 'bg-danger-soft' : 'bg-accent-soft',
+                                'flex-1 justify-center px-[5px]',
+                                TONE_BG[tone],
                                 starts && 'rounded-l-md',
                                 ends && 'rounded-r-md',
                               )}
                             >
-                              <Text
-                                numberOfLines={1}
-                                className={cn(
-                                  'text-[11px] leading-[18px] font-medium',
-                                  done ? 'text-muted line-through' : late ? 'text-danger-soft-foreground' : 'text-accent-soft-foreground',
-                                )}
-                              >
+                              <Text numberOfLines={1} className={cn('text-[12px] leading-[20px] font-semibold', TONE_TEXT[tone])}>
                                 {e.title}
                               </Text>
                             </View>

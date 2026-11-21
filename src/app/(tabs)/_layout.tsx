@@ -89,7 +89,7 @@ function TabItem({
       >
         <Icon name={tab.icon} size={20} tint={focused ? c.accentInk : c.sub} filled={focused} />
         <Text
-          className={cn('text-[11px] leading-[13px]', focused ? 'font-semibold text-accent-soft-foreground' : 'font-medium text-muted')}
+          className={cn('text-[12px] leading-[14px]', focused ? 'font-semibold text-accent-soft-foreground' : 'font-medium text-muted')}
           maxFontSizeMultiplier={1.2}
         >
           {tab.title}
@@ -99,7 +99,7 @@ function TabItem({
   );
 }
 
-// 떠 있는 알약 탭 바(좌우 16, 높이 64, 안쪽 6). 고른 탭만 베리 soft 알약 위 채운 아이콘과 베리 글자.
+// 떠 있는 알약 탭 바(좌우 16, 높이 62, 안쪽 6, 다크는 surface-raised 면). 고른 탭만 베리 soft 알약 위 채운 아이콘과 베리 글자.
 // 화면 위에 겹쳐 뜨므로 탭 화면의 스크롤 콘텐츠는 useTabBarInset()만큼 아래를 비운다
 function PillTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const bottom = useTabBarBottom();

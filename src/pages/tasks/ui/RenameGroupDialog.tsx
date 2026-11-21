@@ -22,7 +22,7 @@ export function RenameGroupDialog({ name, onSave, onClose }: { name: string; onS
     <Animated.View
       entering={FadeIn.duration(160).reduceMotion(ReduceMotion.System)}
       exiting={FadeOut.duration(160).reduceMotion(ReduceMotion.System)}
-      className="absolute inset-0 bg-black/25"
+      className="absolute inset-0 bg-backdrop"
     >
       <Pressable className="absolute inset-0" onPress={onClose} accessibilityLabel="닫기" />
       {/* KeyboardAvoidingView는 className 대상이 아니라 style로 지정한다. 카드 밖을 누르면 뒤의 닫기 Pressable이 받는다 */}
@@ -49,14 +49,14 @@ export function RenameGroupDialog({ name, onSave, onClose }: { name: string; onS
           <View className="mt-1 flex-row justify-end gap-2">
             <Pressable
               onPress={onClose}
-              className="h-10 items-center justify-center rounded-full bg-default px-4 active:opacity-70"
+              className="h-11 items-center justify-center rounded-full bg-default px-4 active:opacity-70"
               accessibilityRole="button"
             >
               <Text className="text-[15px] font-semibold text-default-foreground">취소</Text>
             </Pressable>
             <Pressable
               onPress={save}
-              className="h-10 items-center justify-center rounded-full bg-accent px-4 active:opacity-70"
+              className="h-11 items-center justify-center rounded-full bg-accent px-4 active:opacity-70"
               accessibilityRole="button"
             >
               <Text className="text-[15px] font-semibold text-accent-foreground">저장</Text>

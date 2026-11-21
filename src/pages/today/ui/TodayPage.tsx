@@ -1,4 +1,3 @@
-import { Button } from 'heroui-native';
 import { router, useScrollToTop } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useRef, useState } from 'react';
@@ -17,26 +16,30 @@ import {
 } from '@/entities/event';
 import {
   type Habit,
+  habitDayState,
+  type HabitForDay,
   HABIT_SQL,
   type HabitLog,
+  habitTally,
   HabitTile,
   isMilestone,
   isScheduled,
   streak,
   STREAK_LOOKBACK_DAYS,
   StreakToastIcon,
+  streakUnit,
   toggleHabitLog,
   weekCount,
+  weeklyCaption,
 } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
 import { addDays, toDateStr, useSettledOrder, useToday, weekday, WEEKDAY_KO } from '@/shared/lib';
-import { haptic, ListGroup, ListHeader, Lozenge, showToast, Text, useColor, useTabBarInset } from '@/shared/ui';
+import { EmptyState, haptic, LargeTitle, ListGroup, ListHeader, Lozenge, showToast, Text, useColor, useTabBarInset } from '@/shared/ui';
 import { QuickAddRow } from './QuickAddRow';
 import { TodayProgressCard } from './TodayProgressCard';
 
 const taskId = (e: EventRow) => e.id;
 const taskDone = (e: EventRow) => !!e.completed_at;
-const unitOf = (h: Habit) => (h.frequency_type === 'weekly' ? '주' : h.frequency_type === 'weekdays' ? '회' : '일');
 
 // S01 오늘. 노션 대시보드 'JUST DO IT.' 대체(L-01)
 // '11월 21일 토요일'
@@ -65,6 +68,14 @@ export function TodayPage() {
     return m;
   }, [logs]);
   const isDone = (id: string) => !!doneByHabit.get(id)?.has(today);
+  // 주 N회 습관은 이번 주 진행을 함께 본다. 목표를 채운 날은 오늘 분모에서 빠진다
+  const dayOf = (h: Habit): HabitForDay => ({
+    doneToday: isDone(h.id),
+    weekly:
+      h.frequency_type === 'weekly'
+        ? { done: weekCount(doneByHabit.get(h.id) ?? new Set(), today), target: h.weekly_target ?? 1 }
+        : undefined,
+  });
 
   // 오늘 끝낸 할 일은 하루 동안 체크된 채로 목록에 남긴다. 잘못 체크해도 바로 되돌릴 수 있다
   const openOrDoneToday = (e: EventRow) => !e.completed_at || toDateStr(new Date(e.completed_at)) === today;
@@ -78,12 +89,12 @@ export function TodayPage() {
   const settledOverdue = useSettledOrder(overdue, taskId, taskDone);
   const settledUndated = useSettledOrder(undated, taskId, taskDone);
 
-  const habitsDone = habits.filter((h) => isDone(h.id)).length;
+  const habitCount = habitTally(habits.map(dayOf));
   // FR-09: 할 일 진행률은 오늘 날짜에 걸친 할 일만 센다(지연·날짜 없는 할 일 제외)
   const tasksAll = todays.length;
   const tasksDone = todays.filter((e) => e.completed_at).length;
-  const itemsDone = habitsDone + tasksDone;
-  const itemsAll = habits.length + tasksAll;
+  const itemsDone = habitCount.done + tasksDone;
+  const itemsAll = habitCount.total + tasksAll;
 
   // 지연된 할 일이 남아 있으면 '모두 완료'라고 하지 않는다(진행률 분모에는 지연이 없다)
   const allDone = itemsAll > 0 && itemsDone === itemsAll && overdueOpen.length === 0;
@@ -91,16 +102,22 @@ export function TodayPage() {
   const [finishing, setFinishing] = useState(false);
   const finishesDay = itemsDone + 1 === itemsAll && overdueOpen.length === 0;
   const check = (h: Habit) => {
-    const finishes = !isDone(h.id) && finishesDay;
+    // 이번 주 목표를 채운 습관은 분모에 없어서 오늘 체크해도 남은 개수가 줄지 않는다
+    const finishes = habitDayState(dayOf(h)) === 'todo' && finishesDay;
     setFinishing(finishes);
     if (!isDone(h.id)) {
       // 이 체크로 연속 기록이 이정표(3·7·14·30·100)에 닿으면 축하. 모두 완료와 겹치면 햅틱은 모두 완료 쪽만
       const dates = doneByHabit.get(h.id) ?? new Set<string>();
       const before = streak(h, dates, today).current;
       const after = streak(h, new Set(dates).add(today), today).current;
+      const unit = streakUnit(h);
       if (after > before && isMilestone(after)) {
         if (!finishes) haptic.milestone();
-        showToast({ message: `${h.name} ${after}${unitOf(h)} 연속이에요!`, tone: 'success', leading: <StreakToastIcon count={after} /> });
+        showToast({
+          message: `${h.name} ${after}${unit} 연속이에요`,
+          tone: 'success',
+          leading: <StreakToastIcon count={after} unit={unit} />,
+        });
       }
     }
     toggleHabitLog(db, h.id, today);
@@ -129,8 +146,9 @@ export function TodayPage() {
     header: React.ReactNode,
     footer?: React.ReactNode,
   ) => (
-    <View className="mt-4">
+    <View className="mt-3">
       <TaskList
+        context="sameDay"
         header={header}
         footer={footer}
         tasks={settled.ordered}
@@ -144,26 +162,22 @@ export function TodayPage() {
     </View>
   );
 
-  const hour = new Date().getHours();
-  // 카드 맨 위 한 줄 배너. 넘치면 글자를 줄여 한 줄을 지킨다
-  const greeting =
-    itemsAll === 0
+  // 진행 카드 제목: 남은 개수, 다 하면 인사. 링이 다 찼어도 지연이 남으면 그것을 말한다
+  const title = allDone
+    ? '오늘 하루도 수고했어요'
+    : itemsAll === 0
       ? '오늘 딸 체크베리가 아직 없어요'
-      : allDone
-        ? '체크베리를 모두 수확했어요'
-        : hour < 12
-          ? '좋은 아침이에요'
-          : hour < 18
-            ? '오후도 힘내요'
-            : '오늘 하루도 수고했어요';
+      : itemsDone < itemsAll
+        ? `체크베리 ${itemsAll - itemsDone}개 남았어요`
+        : `지연된 할 일 ${overdueOpen.length}개가 남았어요`;
+  // 오늘 할 습관도, 오늘·지연 할 일도 없으면 빈 상태 카드와 바로 추가 카드만
+  const nothingToday = habits.length === 0 && todays.length === 0 && overdue.length === 0;
 
   const textLink = (label: string, onPress: () => void) => (
     <Pressable onPress={onPress} hitSlop={8} className="min-h-9 justify-center active:opacity-60" accessibilityRole="button">
       <Text className="text-[15px] font-semibold text-accent">{label}</Text>
     </Pressable>
   );
-
-  // 2열 타일. 홀수면 마지막 줄 오른쪽을 빈 칸으로 채워 너비를 맞춘다
 
   return (
     // 바로 추가 칸에 포커스하면 키보드 위 16pt로 올라온다. KeyboardAwareScrollView는 className 대상이 아니라 style로 지정한다
@@ -176,77 +190,65 @@ export function TodayPage() {
       // 키보드가 열린 채로 '추가' 버튼이 한 번에 눌리게 한다
       keyboardShouldPersistTaps="handled"
     >
-      {/* 날짜를 베리 soft 알약으로 제목 위에 둔다(오늘이 며칠인지가 이 화면의 첫 정보) */}
-      <View className="mt-1 h-7 justify-center self-start rounded-full bg-accent-soft px-3">
-        <Text className="text-[14px] leading-5 font-semibold text-accent-soft-foreground" maxFontSizeMultiplier={1.3}>
-          {longDate(today)}
-        </Text>
-      </View>
-      <Text
-        className="mt-1.5 mb-4 text-[34px] leading-10 font-bold tracking-[-0.8px]"
-        accessibilityRole="header"
-        maxFontSizeMultiplier={1.3}
-      >
-        오늘
-      </Text>
+      <LargeTitle
+        title="오늘"
+        chips={
+          <>
+            <Lozenge size="lg" label={longDate(today)} />
+            {overdueOpen.length > 0 && <Lozenge size="lg" tone="danger" label={`지연 ${overdueOpen.length}`} />}
+          </>
+        }
+      />
 
-      <TodayProgressCard
-        greeting={greeting}
-        habitsDone={habitsDone}
-        habitsTotal={habits.length}
-        tasksDone={tasksDone}
-        tasksTotal={tasksAll}
-        allDone={allDone}
-        finishing={finishing}
-      >
-        {overdueOpen.length > 0 && (
-          <View className="flex-row">
-            <Lozenge label={`지연 ${overdueOpen.length}`} tone="danger" />
-          </View>
-        )}
-      </TodayProgressCard>
+      {nothingToday ? (
+        <EmptyState
+          art="today"
+          title="오늘 딸 체크베리가 아직 없어요"
+          body={'습관을 만들면 매일 여기서 체크해요.\n할 일은 아래에 바로 적을 수 있어요.'}
+          action={{ label: '습관 추가', tone: 'habit', onPress: () => router.push('/habits/new') }}
+        />
+      ) : (
+        <>
+          <TodayProgressCard
+            title={title}
+            habitsDone={habitCount.done}
+            habitsTotal={habitCount.total}
+            tasksDone={tasksDone}
+            tasksTotal={tasksAll}
+            allDone={allDone}
+            finishing={finishing}
+          />
 
-      {itemsAll === 0 && (
-        // 오늘 할 것이 없으면 카드 아래 바로 첫 동작 두 개
-        <View className="mt-3 flex-row justify-center gap-2">
-          <Button size="sm" variant="secondary" onPress={() => router.push('/habits/new')}>
-            <Button.Label>습관 추가</Button.Label>
-          </Button>
-          <Button size="sm" variant="secondary" onPress={() => router.push({ pathname: '/event', params: { date: today } })}>
-            <Button.Label>할 일 추가</Button.Label>
-          </Button>
-        </View>
+          <ListGroup className="mt-3 pb-4">
+            <ListHeader inCard title="습관" count={habits.length ? `${habitCount.done}/${habitCount.total}` : undefined} />
+            {habits.length === 0 ? (
+              <View className="min-h-[44px] flex-row items-center justify-between">
+                <Text className="text-[15px] text-muted">오늘 할 습관이 없어요.</Text>
+                {textLink('습관 추가', () => router.push('/habits/new'))}
+              </View>
+            ) : (
+              // 누르면 체크, 길게 누르면 편집. 오른쪽 연속 기록 메달, 주 N회는 이번 주 진행 캡션
+              <View className="gap-2">
+                {habits.map((h) => {
+                  const day = dayOf(h);
+                  return (
+                    <HabitTile
+                      key={h.id}
+                      name={h.name}
+                      iconKey={h.icon_key}
+                      state={habitDayState(day)}
+                      caption={day.weekly && weeklyCaption(day.weekly)}
+                      streak={{ count: streak(h, doneByHabit.get(h.id) ?? new Set<string>(), today).current, unit: streakUnit(h) }}
+                      onToggle={() => check(h)}
+                      onLongPress={() => edit(h.id)}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </ListGroup>
+        </>
       )}
-
-      <ListGroup className="mt-4 pb-4">
-        <ListHeader inCard title="습관" count={habits.length ? `${habitsDone}/${habits.length}` : undefined} />
-        {habits.length === 0 ? (
-          <View className="min-h-[44px] flex-row items-center justify-between">
-            <Text className="text-[15px] text-muted">오늘 할 습관이 없어요.</Text>
-            {textLink('습관 추가', () => router.push('/habits/new'))}
-          </View>
-        ) : (
-          // 누르면 체크, 길게 누르면 편집. 타일 아래 연속 기록 알약(3 이상이면 초록 불꽃), 주 N회는 이번 주 점
-          <View className="gap-2">
-            {habits.map((h) => {
-              const dates = doneByHabit.get(h.id) ?? new Set<string>();
-              const weekly = h.frequency_type === 'weekly';
-              return (
-                <HabitTile
-                  key={h.id}
-                  name={h.name}
-                  iconKey={h.icon_key}
-                  done={isDone(h.id)}
-                  streak={{ count: streak(h, dates, today).current, unit: unitOf(h) }}
-                  week={weekly ? { done: weekCount(dates, today), target: h.weekly_target ?? 1 } : undefined}
-                  onToggle={() => check(h)}
-                  onLongPress={() => edit(h.id)}
-                />
-              );
-            })}
-          </View>
-        )}
-      </ListGroup>
 
       {overdue.length > 0 &&
         list(

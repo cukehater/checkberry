@@ -22,7 +22,7 @@ export function QuickAddRow({ onAdd, placeholder = '오늘 할 일 바로 추가
 
   return (
     <View className="flex-row items-center gap-3 pb-1.5">
-      <View className="h-6 w-6 items-center justify-center rounded-lg border-[1.5px] border-dashed border-border">
+      <View className="h-6 w-6 items-center justify-center rounded-lg border-[1.5px] border-dashed border-border-strong">
         <Icon name="plus" size={12} tint={c.sub} />
       </View>
       <TextInput

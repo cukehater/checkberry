@@ -26,7 +26,8 @@ function Item({ label, desc, dot, icon, onPress }: { label: string; desc?: strin
   return (
     // 카드 안 행: 유형 아이콘 칩, 제목·설명, 오른쪽 화살표
     <Pressable onPress={onPress} className="flex-row items-center gap-3 active:opacity-60" accessibilityRole="button">
-      <IconChip name={icon} size={32} />
+      {/* 장식이라 베리를 쓰지 않고 회색 원 + 보조 글자색 */}
+      <IconChip name={icon} size={32} tone="neutral" />
       <View className={cn('flex-1 flex-row items-center gap-2 py-3', desc ? 'min-h-[68px]' : 'min-h-14')}>
         <View className="flex-1 gap-0.5">
           <Text className="text-[16px] leading-[22px] font-medium">{label}</Text>
@@ -72,10 +73,12 @@ export function SettingsPage() {
   const backupDot = !last ? 'bg-muted' : diffDays(toDateStr(new Date(last)), today) <= 7 ? 'bg-success' : 'bg-warning';
 
   const wipe = run(async () => {
+    // 지우기 직전 스냅숏은 기기에 남지만 앱에서 되돌리는 화면은 없다. 되돌릴 수 있는 길(백업 파일)만 안내한다
     const ok = await confirm({
-      title: '모든 데이터를 삭제할까요?',
-      message: '습관, 습관 기록, 할 일이 모두 지워져요. 지우기 직전 상태는 기기 안에만 따로 남겨 둬요.',
-      confirmLabel: '삭제',
+      title: '모든 데이터를 지울까요?',
+      message: '습관, 습관 기록, 할 일이 모두 지워져요.',
+      hint: '앱에서는 되돌릴 수 없어요. 필요하면 먼저 백업 파일을 만들어 두세요.',
+      confirmLabel: '모두 지우기',
       destructive: true,
     });
     if (!ok) return;

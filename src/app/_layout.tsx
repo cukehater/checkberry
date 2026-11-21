@@ -66,9 +66,19 @@ function Root() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="welcome" options={{ headerShown: false }} />
-            <Stack.Screen name="event" options={{ presentation: 'modal', title: '할 일' }} />
-            <Stack.Screen name="habits/new" options={{ presentation: 'modal', title: '습관 추가' }} />
-            <Stack.Screen name="habits/[id]/edit" options={{ presentation: 'modal', title: '습관 편집' }} />
+            {/* 시트는 시스템 헤더 대신 화면 안의 SheetHeader(손잡이 + 취소·저장 알약)를 쓴다 */}
+            <Stack.Screen
+              name="event"
+              options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: c.sheet } }}
+            />
+            <Stack.Screen
+              name="habits/new"
+              options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: c.sheet } }}
+            />
+            <Stack.Screen
+              name="habits/[id]/edit"
+              options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: c.sheet } }}
+            />
             <Stack.Screen name="settings/index" options={{ title: '설정', headerShown: false }} />
           </Stack>
           <UndoBar />

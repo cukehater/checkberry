@@ -10,7 +10,10 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { cn } from '@/shared/lib';
 import { CheckGlyph, duration, easing, haptic, spring, Text, useColor, usePressScale } from '@/shared/ui';
+import type { StreakUnit } from '../model/stage';
+import type { HabitDayState } from '../model/today';
 import { HabitIcon } from './HabitIcon';
 import { StreakBadge } from './StreakBadge';
 
@@ -32,33 +35,37 @@ function Shard({ index, color }: { index: number; color: string }) {
       { scale: 1 - 0.5 * p.get() },
     ],
   }));
-  return <Animated.View className="absolute top-[17px] left-[17px] h-1.5 w-1.5 rounded-full" style={[{ backgroundColor: color }, style]} />;
+  return <Animated.View className="absolute top-4 left-4 h-1.5 w-1.5 rounded-full" style={[{ backgroundColor: color }, style]} />;
 }
 
 /**
- * 오늘 화면 습관 타일. 한 줄에 하나씩 전체 폭(최소 높이 60, 모서리 18).
- * [원][이름 / 주 N회 점][연속 불꽃 + 숫자]. 아직: 옅은 강조색 원 + 아이콘 / 완료: 강조색 원이 튀며 차고 체크가 그려진다.
- * 이름은 두 줄까지 보여 주고 넘치면 말줄임
+ * 오늘 화면 습관 타일. 한 줄에 하나씩 전체 폭(58pt, 모서리 18). [원 38][이름 / 캡션][연속 메달 배지].
+ * todo: 베리 soft 원 + 아이콘 / done: 베리 원이 튀며 차고 흰 체크가 그려진다 /
+ * weekDone: 주 N회 목표를 이번 주에 채운 날(오늘 분모에서 빠짐). 베리 soft 원 + 1.5pt 베리 테두리 + 베리 ink 체크
  */
 export function HabitTile({
   name,
   iconKey,
-  done,
+  state,
+  caption,
   streak,
-  week,
+  accessory,
   onToggle,
   onLongPress,
 }: {
   name: string;
   iconKey: string;
-  done: boolean;
-  /** 연속 기록. 오른쪽 고정 폭 칸에 불꽃 + 숫자. 0이면 꺼진 재로 자리를 지킨다 */
-  streak?: { count: number; unit: '일' | '회' | '주' };
-  /** 주 N회 습관의 이번 주 진행. 목표 칸만큼 점을 채운다 */
-  week?: { done: number; target: number };
-  onToggle: () => void;
+  state: HabitDayState;
+  /** 이름 아래 13pt 글자. 주 N회 습관의 '이번 주 2/3' */
+  caption?: string;
+  /** 연속 기록 메달 배지. 0이면 그리지 않는다 */
+  streak?: { count: number; unit: StreakUnit };
+  /** 배지 자리에 대신 둘 요소(습관 추가 시트 미리보기의 안내 글자) */
+  accessory?: React.ReactNode;
+  onToggle?: () => void;
   onLongPress?: () => void;
 }) {
+  const done = state === 'done';
   const c = useColor();
   const reduce = useReducedMotion();
   const press = usePressScale();
@@ -94,29 +101,44 @@ export function HabitTile({
 
   return (
     <Pressable
-      onPress={() => {
-        if (done) haptic.uncheck();
-        else {
-          haptic.checkStrong();
-          if (!reduce) setBurst((k) => k + 1);
-        }
-        onToggle();
-      }}
+      onPress={
+        onToggle &&
+        (() => {
+          if (done) haptic.uncheck();
+          else {
+            haptic.checkStrong();
+            if (!reduce) setBurst((k) => k + 1);
+          }
+          onToggle();
+        })
+      }
       onLongPress={onLongPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
-      accessibilityLabel={`${name}, 오늘 ${done ? '완료' : '미완료'}${streak?.count ? `, ${streak.count}${streak.unit} 연속` : ''}${week ? `, 이번 주 ${week.done}/${week.target}` : ''}`}
+      accessibilityState={{ checked: state !== 'todo', disabled: !onToggle }}
+      accessibilityLabel={`${name}, 오늘 ${done ? '완료' : state === 'weekDone' ? '이번 주 목표 달성' : '미완료'}${streak?.count ? `, ${streak.count}${streak.unit} 연속` : ''}${caption ? `, ${caption}` : ''}`}
       accessibilityHint={onLongPress ? '길게 누르면 편집해요' : undefined}
     >
       <Animated.View
-        className="min-h-[60px] flex-row items-center gap-3 rounded-[18px] bg-surface-secondary px-2.5 py-2.5"
+        className="min-h-[58px] flex-row items-center gap-3 rounded-[18px] bg-surface-secondary px-2.5 py-2"
         style={press.style}
       >
         <View>
-          <Animated.View className="h-10 w-10 items-center justify-center rounded-full" style={circleStyle}>
-            {done ? <CheckGlyph size={20} color={c.onAccent} /> : <HabitIcon iconKey={iconKey} size={18} tint={c.accentInk} />}
+          <Animated.View
+            className={cn(
+              'h-[38px] w-[38px] items-center justify-center rounded-full',
+              state === 'weekDone' && 'border-[1.5px] border-accent',
+            )}
+            style={circleStyle}
+          >
+            {done ? (
+              <CheckGlyph size={18} color={c.onAccent} />
+            ) : state === 'weekDone' ? (
+              <CheckGlyph size={18} color={c.accentInk} />
+            ) : (
+              <HabitIcon iconKey={iconKey} size={18} tint={c.accentInk} />
+            )}
           </Animated.View>
           {burst > 0 && (
             <View key={burst} pointerEvents="none" className="absolute inset-0" accessibilityElementsHidden>
@@ -126,24 +148,18 @@ export function HabitTile({
             </View>
           )}
         </View>
-        <View className="min-w-0 flex-1 gap-px">
-          <Text className="text-[15px] leading-5 font-medium" numberOfLines={2}>
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text className="text-[16px] leading-[22px] font-medium" numberOfLines={1}>
             {name}
           </Text>
-          {week && (
-            // 목표 칸 수만큼 점, 채운 만큼 잎 초록
-            <Animated.View className="min-h-4 flex-row items-center gap-[3px]" style={[{ transformOrigin: 'left center' }, metaStyle]}>
-              {Array.from({ length: week.target }, (_, i) => (
-                <View key={i} className={i < week.done ? 'h-1.5 w-1.5 rounded-full bg-success' : 'h-1.5 w-1.5 rounded-full bg-track'} />
-              ))}
-            </Animated.View>
-          )}
+          {caption && <Text className="text-[13px] leading-[18px] font-medium text-muted">{caption}</Text>}
         </View>
-        {streak && (
-          <Animated.View style={metaStyle}>
-            <StreakBadge count={streak.count} unit={streak.unit} />
-          </Animated.View>
-        )}
+        {accessory ??
+          (streak && (
+            <Animated.View style={metaStyle}>
+              <StreakBadge count={streak.count} unit={streak.unit} playKey={burst} />
+            </Animated.View>
+          ))}
       </Animated.View>
     </Pressable>
   );

@@ -23,9 +23,9 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
       --surface-tertiary: #f2ece1;
       --overlay: #ffffff;
       --overlay-foreground: #1f1a17;
-      --backdrop: rgba(31, 26, 23, 0.25);
+      --backdrop: rgba(48, 36, 24, 0.34); /* 다이얼로그 스크림 */
 
-      --muted: #6f675f; /* bg 위 5.24:1 */
+      --muted: #6b635b; /* 카드 위 5.9:1 */
       --default: #eee7da; /* 보조 버튼, 탭 트랙 */
       --default-foreground: #1f1a17;
 
@@ -56,13 +56,18 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
       /* checkberry 전용: soft 바탕과 그 위 글자색 (HeroUI 계산값 대신 고정값) */
       --cb-accent-tint: #ffe4e9;
       --cb-accent-ink: #b4123a; /* 5.68:1 */
-      --cb-success-tint: #edf6e1;
-      --cb-success-ink: #3d7311; /* 5.16:1 */
-      --cb-warning-tint: #fff1dc;
-      --cb-warning-ink: #8a5e1f; /* 5.10:1 */
+      --cb-success-tint: #eaf5dd; /* 잎 soft: 링 트랙, 캘린더 막대, 할 일 버튼 */
+      --cb-success-ink: #3b6e10; /* 5.4:1 */
+      --cb-warning-tint: #fff1d6; /* 호박(ember): 우선순위, 연속 3단계 */
+      --cb-warning-ink: #8a5300; /* 5.7:1 */
       --cb-danger-tint: #fdebdf;
       --cb-danger-ink: #b23a0b; /* 5.17:1 */
       --cb-track: #d9cfbf; /* 꺼진 스위치, 빈 마디 테두리 */
+      --cb-border-strong: #958b80; /* 안 체크한 체크 상자 테두리, 카드 위 3.3:1 */
+      --cb-frost-tint: #e6f1f8; /* 연속 1단계(얼음) */
+      --cb-frost-ink: #2f5d7c;
+      --cb-danger-line: #c2410c; /* 오류 입력칸 테두리 */
+      --cb-sheet: #fdf8ec; /* 시트 바닥 */
     }
 
     @variant dark {
@@ -73,11 +78,11 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
       --surface-foreground: #fbf6ee;
       --surface-secondary: #27221f;
       --surface-tertiary: #2b2522;
-      --overlay: #1d1917;
+      --overlay: #2a2420; /* surface-raised: 다이얼로그, 탭 바, 키보드 막대. 카드보다 한 층 밝게 */
       --overlay-foreground: #fbf6ee;
-      --backdrop: rgba(0, 0, 0, 0.5);
+      --backdrop: rgba(0, 0, 0, 0.62);
 
-      --muted: #a8a099; /* bg 위 7.45:1 */
+      --muted: #b5aca3; /* 카드 위 7.8:1 */
       --default: #2e2825;
       --default-foreground: #fbf6ee;
 
@@ -107,13 +112,18 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
 
       --cb-accent-tint: #3b1520;
       --cb-accent-ink: #ff8fa6; /* 7.41:1 */
-      --cb-success-tint: #1f2c14;
-      --cb-success-ink: #a6db74; /* 9.10:1 */
-      --cb-warning-tint: #342b1e;
-      --cb-warning-ink: #fad094; /* 9.61:1 */
+      --cb-success-tint: #1e2c13;
+      --cb-success-ink: #a6da74; /* 9.1:1 */
+      --cb-warning-tint: #2a1f0b;
+      --cb-warning-ink: #f4c978; /* 10.4:1 */
       --cb-danger-tint: #3a1d12;
       --cb-danger-ink: #f59a70; /* 7.14:1 */
       --cb-track: #544a43;
+      --cb-border-strong: #7a7069; /* 카드 위 3.6:1 */
+      --cb-frost-tint: #14232e;
+      --cb-frost-ink: #9bc8e6;
+      --cb-danger-line: #f0763a;
+      --cb-sheet: #171311;
     }
   }
 }
@@ -129,6 +139,11 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
   --color-danger-soft: var(--cb-danger-tint);
   --color-danger-soft-foreground: var(--cb-danger-ink);
   --color-track: var(--cb-track); /* bg-track, border-track */
+  --color-border-strong: var(--cb-border-strong);
+  --color-frost-soft: var(--cb-frost-tint);
+  --color-frost-soft-foreground: var(--cb-frost-ink);
+  --color-danger-line: var(--cb-danger-line);
+  --color-sheet: var(--cb-sheet);
 }
 
 /* ── 3. 글자 단계 (시스템 글꼴, fontFamily 지정 없음) ──────────── */
@@ -171,9 +186,9 @@ className을 못 쓰는 곳은 src/shared/ui/theme.ts의 useColor()가 같은 �
   --text-tab--font-weight: 600;
 }
 
-/* 프로젝트 전용 별칭: 목록 카드(card), 다이얼로그 면(elevated), 탭 바(bar) */
+/* 프로젝트 전용 별칭: 목록 카드(card), 다이얼로그 면(elevated), 탭 바(bar). elevated·bar는 다크에서 카드보다 밝은 surface-raised */
 @theme inline {
   --color-card: var(--surface);
   --color-elevated: var(--overlay);
-  --color-bar: var(--surface);
+  --color-bar: var(--overlay);
 }

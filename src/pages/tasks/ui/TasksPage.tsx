@@ -23,13 +23,14 @@ import { cn, useToday } from '@/shared/lib';
 import {
   confirm,
   duration,
+  EmptyState,
   haptic,
   Icon,
   LargeTitle,
   Lozenge,
   SearchField,
   Segmented,
-  showDialog,
+  showMenu,
   showUndo,
   Text,
   useColor,
@@ -96,7 +97,8 @@ export function TasksPage() {
   const sections = [
     {
       id: 'none',
-      name: '할 일',
+      // 화면 제목 '할 일'과 겹치지 않게. 시트의 그룹 칩 '없음'과 같은 뜻
+      name: '그룹 없음',
       items: events.filter((e) => !e.group_id).sort(filter === 'done' ? byCompletedDesc : compareTasks),
       manual: false,
     },
@@ -120,22 +122,22 @@ export function TasksPage() {
     setOrder(db, ids);
   };
 
-  // 그룹 머리 길게 누르기: 이름 바꾸기·삭제. 삭제해도 할 일은 그룹 없음으로 옮겨 남긴다
-  const manageGroup = (g: Group) => {
+  // 그룹 머리 길게 누르기: 목록형 메뉴(이름 바꾸기·그룹 삭제). 삭제는 확인을 한 번 더 받고, 할 일은 그룹 없음으로 옮겨 남긴다
+  const manageGroup = (g: Group, count: number) => {
     haptic.lift();
-    showDialog({
-      title: g.name,
-      actions: [
-        { label: '취소', style: 'cancel' },
-        { label: '이름 바꾸기', onPress: () => setRenaming(g) },
-        { label: '그룹 삭제', style: 'destructive', onPress: () => removeGroup(g) },
+    showMenu({
+      title: `${g.name} 그룹`,
+      subtitle: `할 일 ${count}개`,
+      items: [
+        { icon: 'pencil', label: '이름 바꾸기', onPress: () => setRenaming(g) },
+        { icon: 'trash', label: '그룹 삭제', destructive: true, onPress: () => removeGroup(g) },
       ],
     });
   };
   const removeGroup = async (g: Group) => {
     const ok = await confirm({
       title: '그룹을 삭제할까요?',
-      message: `'${g.name}' 안의 할 일은 지우지 않고 그룹 없는 할 일로 옮겨요.`,
+      message: `‘${g.name}’ 안의 할 일은 지우지 않고 그룹 없음으로 옮겨요.`,
       confirmLabel: '삭제',
       destructive: true,
     });
@@ -159,6 +161,14 @@ export function TasksPage() {
         <View className="px-1">
           <LargeTitle
             title="할 일"
+            chips={
+              remaining > 0 && (
+                <>
+                  <Lozenge size="lg" label={`남은 ${remaining}`} />
+                  {overdueCount > 0 && <Lozenge size="lg" tone="danger" label={`지연 ${overdueCount}`} />}
+                </>
+              )
+            }
             accessory={
               canReorder && (
                 <Pressable
@@ -174,29 +184,32 @@ export function TasksPage() {
               )
             }
           />
-          {remaining > 0 && (
-            <View className="-mt-2 mb-4 flex-row gap-1.5">
-              <Lozenge label={`남은 ${remaining}`} />
-              {overdueCount > 0 && <Lozenge tone="danger" label={`지연 ${overdueCount}`} />}
+        </View>
+        {allEvents.length === 0 ? (
+          // 할 일이 하나도 없으면 검색·필터를 숨기고 빈 상태 카드만
+          <EmptyState
+            art="tasks"
+            title="할 일이 없어요"
+            body={'할 일을 추가하면 그룹별로 모아\n오늘 해야 할 것부터 보여 줘요.'}
+            action={{ label: '할 일 추가', tone: 'task', onPress: () => router.push('/event') }}
+          />
+        ) : (
+          <>
+            <SearchField value={query} onChangeText={setQuery} placeholder="검색" accessibilityLabel="할 일 검색" />
+            <View className="mt-3">
+              <Segmented options={FILTERS} value={filter} onChange={setFilter} />
             </View>
-          )}
-        </View>
-        <SearchField value={query} onChangeText={setQuery} placeholder="검색" accessibilityLabel="할 일 검색" />
-        <View className="mt-3">
-          <Segmented options={FILTERS} value={filter} onChange={setFilter} />
-        </View>
+          </>
+        )}
 
-        {sections.length === 0 && (
+        {allEvents.length > 0 && sections.length === 0 && (
           <View className="items-center gap-2.5 px-6 py-10">
             <View className="h-14 w-14 items-center justify-center rounded-full bg-default">
               <Icon name={q ? 'search' : 'tasks'} size={24} tint={c.sub} />
             </View>
             <Text className="text-center text-[17px] leading-6 font-semibold">
-              {q ? '검색 결과가 없어요.' : filter === 'done' ? '아직 완료한 할 일이 없어요.' : '할 일이 없어요.'}
+              {q ? '검색 결과가 없어요.' : filter === 'done' ? '아직 완료한 할 일이 없어요.' : '이 조건의 할 일이 없어요.'}
             </Text>
-            {!q && filter !== 'done' && (
-              <Text className="text-center text-[15px] leading-5 text-muted">오른쪽 위 +를 눌러 추가해 보세요.</Text>
-            )}
           </View>
         )}
         <LayoutAnimationConfig skipEntering>
@@ -210,10 +223,11 @@ export function TasksPage() {
                   count={sec.items.length}
                   open={open}
                   onToggle={() => setClosed({ ...closed, [sec.id]: open })}
-                  onLongPress={group && (() => manageGroup(group))}
+                  onLongPress={group && (() => manageGroup(group, sec.items.length))}
                 >
                   <TaskList
                     flat
+                    context={filter === 'today' ? 'sameDay' : 'list'}
                     tasks={sec.items}
                     today={today}
                     onToggle={(e) => toggleTask(db, e, today)}

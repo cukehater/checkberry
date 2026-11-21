@@ -1,7 +1,8 @@
-import { type Href, router, Stack, usePreventRemove } from 'expo-router';
+import { type Href, router, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { showDialog } from './dialog';
-import { useColor } from './theme';
+import { Text } from './primitives';
 
 /**
  * 시트 닫기 보호. 폼 값(snapshot)이 처음과 달라졌으면 스와이프·취소로 닫을 때 확인을 받는다.
@@ -34,20 +35,34 @@ export function useSheetGuard(snapshot: string, ready: boolean) {
 }
 
 /**
- * 시트 상단의 취소·저장. 한 손으로도 키보드에 가리지 않는 자리에 둔다.
- * iOS 26부터 헤더의 커스텀 뷰는 유리 원에 갇히고 다크 모드에서 글자가 묻혀서, 시스템 바 버튼으로 그린다(저장은 틴트로 채운 prominent)
+ * 시트 머리: 손잡이(36×5) + [취소 회색 알약] 제목 [저장 베리 알약]. 시스템 헤더(iOS 26 유리 버튼, 다크에서 밝은 회색 원)를 끄고
+ * FormScreen의 header로 스크롤 위에 고정한다. 취소는 닫기 보호(useSheetGuard)를 거친다
  */
-export function SheetHeader({ onSave }: { onSave: () => void }) {
-  const c = useColor();
-  const font = { fontWeight: '600', fontSize: 15 } as const;
+export function SheetHeader({ title, onSave }: { title: string; onSave: () => void }) {
   return (
-    <Stack.Screen
-      options={{
-        unstable_headerLeftItems: () => [{ type: 'button', label: '취소', labelStyle: font, onPress: () => router.back() }],
-        unstable_headerRightItems: () => [
-          { type: 'button', label: '저장', labelStyle: font, variant: 'prominent', tintColor: c.accent, onPress: onSave },
-        ],
-      }}
-    />
+    <View>
+      <View className="mt-[7px] h-[5px] w-9 self-center rounded-full bg-track" />
+      <View className="mt-1 h-11 flex-row items-center px-4">
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={4}
+          className="h-9 min-w-[60px] items-center justify-center rounded-full bg-default px-4 active:opacity-70"
+          accessibilityRole="button"
+        >
+          <Text className="text-[15px] font-medium">취소</Text>
+        </Pressable>
+        <Text className="flex-1 text-center text-[17px] font-semibold" numberOfLines={1} accessibilityRole="header">
+          {title}
+        </Text>
+        <Pressable
+          onPress={onSave}
+          hitSlop={4}
+          className="h-9 min-w-[60px] items-center justify-center rounded-full bg-accent px-4 active:opacity-70"
+          accessibilityRole="button"
+        >
+          <Text className="text-[15px] font-semibold text-accent-foreground">저장</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

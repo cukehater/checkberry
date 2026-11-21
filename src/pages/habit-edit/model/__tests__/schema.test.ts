@@ -6,7 +6,7 @@ describe('habitSchema', () => {
 
   test('습관: 이름 필수, 시작일 형식', () => {
     expect(fieldErrors(habitSchema, { ...ok, name: '', startDate: '2026-02-30' })).toEqual({
-      name: '이름을 입력해 주세요.',
+      name: '습관 이름을 적어 주세요.',
       startDate: '날짜 형식이 맞지 않아요.',
     });
     expect(fieldErrors(habitSchema, ok)).toEqual({});

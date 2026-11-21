@@ -5,17 +5,17 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { FadeIn, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { type EventRow, TaskList, toggleTask } from '@/entities/event';
-import { type Habit, HABIT_SQL, type HabitLog, isScheduled } from '@/entities/habit';
+import { type Habit, habitDayState, HABIT_SQL, type HabitLog, habitTally, isScheduled } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { cn, type DateStr, formatKo } from '@/shared/lib';
-import { duration as motion, Text, useOverlayShadow, useTabBarInset } from '@/shared/ui';
+import { addDays, cn, type DateStr, formatKo, weekStart } from '@/shared/lib';
+import { duration as motion, Icon, Text, useColor, useOverlayShadow, useTabBarInset } from '@/shared/ui';
 
 // 달력 접기·펼치기(CalendarPage)도 같은 시간으로 패널과 함께 움직인다
 export const DURATION = 250;
 // 핸들을 패널 높이의 30% 넘게 내리거나 빠르게 튕기면 닫는다
 const CLOSE_RATIO = 0.3;
 const CLOSE_VELOCITY = 800;
-const MAX_BERRIES = 5;
+const MAX_DOTS = 5;
 // 패널은 아래에서 올라오니 떠 있는 그림자를 위쪽으로 드리운다
 const SHADOW_UP = { shadowOffset: { width: 0, height: -4 }, elevation: 8 };
 // 날짜를 바꾸면 목록이 옅게 바뀐다(행 추가·삭제·이동은 TaskRow의 LinearTransition이 맡는다)
@@ -65,14 +65,23 @@ export function DayPanel({
       else offset.set(withTiming(0, { duration }));
     },
   });
+  const c = useColor();
   const shadow = useOverlayShadow();
   const tabBarInset = useTabBarInset();
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.get() }] }));
 
-  // 습관 달성률: 그날 해야 하는 습관 중 완료한 수(주 N회 습관은 주 단위라 뺀다, 달성률 계산과 같은 규칙)
-  const habits = useQuery<Habit>(HABIT_SQL.allHabits).filter((h) => h.frequency_type !== 'weekly' && isScheduled(h, date));
-  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [date, date]);
-  const done = habits.filter((h) => logs.some((l) => l.habit_id === h.id)).length;
+  // 그날 습관 수는 오늘 링과 같은 규칙(habitTally): 주 N회 습관이 그 주 목표를 이미 채웠고 그날 안 했으면 뺀다
+  const ws = weekStart(date);
+  const habits = useQuery<Habit>(HABIT_SQL.allHabits).filter((h) => isScheduled(h, date));
+  const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [ws, addDays(ws, 6)]);
+  const days = habits.map((h) => ({
+    doneToday: logs.some((l) => l.habit_id === h.id && l.log_date === date),
+    weekly:
+      h.frequency_type === 'weekly' ? { done: logs.filter((l) => l.habit_id === h.id).length, target: h.weekly_target ?? 1 } : undefined,
+  }));
+  const tally = habitTally(days);
+  const counted = days.filter((d) => habitDayState(d) !== 'weekDone');
+  const future = date > today;
   const label = date === today ? `오늘 · ${formatKo(date, today)}` : formatKo(date, today);
 
   return (
@@ -95,28 +104,48 @@ export function DayPanel({
             <Text className="flex-1 text-[18px] leading-6 font-semibold tracking-[-0.2px]" accessibilityRole="header">
               {label}
             </Text>
-            {habits.length > 0 && (
-              // 예정 습관 하나에 베리 하나: 한 것은 채우고 안 한 것은 옅게(오늘 탭 습관 원과 같은 말). 점은 5개까지, 전체 수는 옆 숫자가 말한다
-              <View accessible accessibilityLabel={`습관 ${habits.length}개 중 ${done}개 완료`} className="flex-row items-center gap-1">
-                {habits.slice(0, MAX_BERRIES).map((h) => (
-                  <View
-                    key={h.id}
-                    className={cn('h-2.5 w-2.5 rounded-full', logs.some((l) => l.habit_id === h.id) ? 'bg-accent' : 'bg-accent-soft')}
-                  />
-                ))}
-                <Text className="ml-1.5 text-[18px] leading-6 font-semibold tracking-[-0.2px] tabular-nums">
-                  {done}
-                  <Text className="text-muted">/{habits.length}</Text>
-                </Text>
-              </View>
-            )}
+            {tally.total > 0 &&
+              (future ? (
+                // 미래: 예정 수만
+                <View className="h-[26px] flex-row items-center gap-1.5 rounded-full bg-default px-2.5">
+                  <Icon name="habits" size={13} tint={c.accentInk} filled />
+                  <Text className="text-[13px] font-semibold">습관 {tally.total}개 예정</Text>
+                </View>
+              ) : (
+                // 지난 날·오늘: '습관 ●●○○ 2/4'. 점은 5개까지
+                <View
+                  accessible
+                  accessibilityLabel={`습관 ${tally.total}개 중 ${tally.done}개 완료`}
+                  className="h-[26px] flex-row items-center gap-1.5 rounded-full bg-default px-2.5"
+                >
+                  <Text className="text-[13px] font-semibold">습관</Text>
+                  <View className="flex-row gap-[3px]">
+                    {[...counted]
+                      .sort((a, b) => Number(b.doneToday) - Number(a.doneToday))
+                      .slice(0, MAX_DOTS)
+                      .map((d, i) => (
+                        <View key={i} className={cn('h-2 w-2 rounded-full', d.doneToday ? 'bg-accent' : 'bg-accent-soft')} />
+                      ))}
+                  </View>
+                  <Text className="text-[13px] font-semibold tabular-nums">
+                    {tally.done}/{tally.total}
+                  </Text>
+                </View>
+              ))}
           </View>
         </View>
       </GestureDetector>
       {/* 패널이 이미 흰 면이라 카드 없이 행을 바로 그린다 */}
       <ScrollView className="flex-1" contentContainerClassName="px-5" contentContainerStyle={{ paddingBottom: tabBarInset }}>
         <Animated.View key={date} entering={SWAP}>
-          <TaskList flat tasks={tasks} today={today} onToggle={(e) => toggleTask(db, e, today)} empty="이날은 할 일이 없어요." />
+          <TaskList
+            flat
+            context="sameDay"
+            tasks={tasks}
+            today={today}
+            onToggle={(e) => toggleTask(db, e, today)}
+            empty="이날은 할 일이 없어요."
+          />
         </Animated.View>
       </ScrollView>
     </Animated.View>

@@ -4,30 +4,42 @@ import { FlatList, Modal, Pressable, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { setSetting, useQuery } from '@/shared/db';
 import { cn } from '@/shared/lib';
-import { allGravityIcons, CARD_SHADOW, GravityIcon, IconButton, SearchField, Text, useColor } from '@/shared/ui';
+import { allGravityIcons, GravityIcon, IconButton, SearchField, Text, useCardStyle, useColor } from '@/shared/ui';
 
+// 습관에 어울리는 32개를 앞에 둔다. API·SQL·화살표 같은 나머지는 검색할 때만 나온다
 const SUGGESTED = [
   'book-open',
+  'books',
   'pencil',
   'graduation-cap',
   'droplet',
+  'cup',
   'mug',
   'pill',
-  'weight-hanging',
-  'person',
-  'flame',
+  'heart-pulse',
   'heart',
+  'person',
+  'persons',
+  'flame',
   'sun',
   'moon',
   'music-note',
-  'brush',
-  'code',
-  'square-article',
-  'wallet',
-  'smartphone',
-  'clock',
   'thunderbolt',
   'sparkles',
+  'clock',
+  'broom-motion',
+  'shopping-cart',
+  'wallet',
+  'gift',
+  'face-smile',
+  'medal',
+  'star',
+  'cherry',
+  'camera',
+  'palette',
+  'paintbrush',
+  'globe',
+  'tv',
 ];
 
 // 한국어로 찾을 때 쓰는 별칭. 값은 아이콘 이름에 들어가는 영문 조각
@@ -122,7 +134,7 @@ export function IconPicker({
   const q = query.trim().toLowerCase();
   const shown = useMemo(() => {
     // 검색 전에는 습관에 어울리는 아이콘을 먼저 보여 준다(이름순이면 API·SQL·화살표 수십 개가 앞에 온다)
-    if (!q) return [...SUGGESTED.filter((n) => names.includes(n)), ...names.filter((n) => !SUGGESTED.includes(n))];
+    if (!q) return SUGGESTED.filter((n) => names.includes(n));
     const parts = Object.entries(KO_ALIASES).flatMap(([ko, en]) => (ko.includes(q) || q.includes(ko) ? en : []));
     return names.filter((n) => n.includes(q) || parts.some((p) => n.includes(p)));
   }, [names, q]);
@@ -163,7 +175,7 @@ export function IconPicker({
                     <IconCell key={n} name={n} on={n === selected} onPress={() => pick(n)} />
                   ))}
                 </View>
-                <Text className="px-1 pt-3 pb-1 text-[14px] leading-5 font-medium">전체</Text>
+                <Text className="px-1 pt-3 pb-1 text-[14px] leading-5 font-medium">추천</Text>
               </View>
             ) : undefined
           }
@@ -177,12 +189,13 @@ export function IconPicker({
 
 function IconCell({ name, on, onPress }: { name: string; on: boolean; onPress: () => void }) {
   const c = useColor();
+  const card = useCardStyle();
   return (
     <View className="w-1/6 p-1">
       <Pressable
         onPress={onPress}
         className={cn('aspect-square items-center justify-center rounded-2xl active:opacity-70', on ? 'bg-accent' : 'bg-card')}
-        style={!on && c.raised ? CARD_SHADOW : undefined}
+        style={on ? undefined : card}
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
         accessibilityLabel={`${name} 아이콘`}

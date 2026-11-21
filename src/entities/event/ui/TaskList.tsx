@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import { duration, ListGroup, Separator, Text } from '@/shared/ui';
 import type { EventRow } from '../model/repo';
-import { type ScrollRef, TaskRow } from './TaskRow';
+import { type RowContext, type ScrollRef, TaskRow } from './TaskRow';
 
 // 행과 그 위 구분선을 한 덩어리로 움직인다. 새 행은 흐려졌다 나타나고(처음 그릴 때는 바로), 빠지는 행은 흐려지며, 나머지는 자리를 옮긴다
 const LAYOUT = LinearTransition.duration(duration.move).reduceMotion(ReduceMotion.System);
@@ -22,6 +22,7 @@ export function TaskList({
   header,
   footer,
   flat,
+  context,
 }: {
   tasks: EventRow[];
   today: string;
@@ -38,6 +39,8 @@ export function TaskList({
   footer?: React.ReactNode;
   /** 카드 없이 행만 그린다(이미 흰 면 위인 캘린더 하루 패널) */
   flat?: boolean;
+  /** 날짜 줄 규칙(TaskRow). 오늘 탭·날짜 패널·'오늘' 필터는 sameDay */
+  context?: RowContext;
 }) {
   const Box = flat ? View : ListGroup;
   // 빈 카드가 남지 않게 한다
@@ -50,7 +53,7 @@ export function TaskList({
         {tasks.map((e, i) => (
           <Animated.View key={e.id} layout={LAYOUT} entering={ENTER} exiting={EXIT}>
             {/* 체크 상자(24) 오른쪽 글자 시작점(36)에 맞춘다 */}
-            {i > 0 && <Separator className="ml-9" />}
+            {i > 0 && <Separator className="ml-[38px]" />}
             <TaskRow
               task={e}
               today={today}
@@ -59,6 +62,7 @@ export function TaskList({
               highlighted={e.id === highlight}
               scrollRef={scrollRef}
               right={right?.(e, i)}
+              context={context}
             />
           </Animated.View>
         ))}

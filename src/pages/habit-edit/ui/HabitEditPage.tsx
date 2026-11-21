@@ -7,20 +7,26 @@ import {
   HabitChip,
   type HabitLog,
   habitRate30,
+  HabitTile,
   iconLabel,
   parseWeekdays,
   restoreHabit,
   saveHabit,
   setHabitArchived,
   softDeleteHabit,
+  STAGE_NAME,
   streak,
+  StreakArt,
+  streakStage,
+  nextStageCopy,
+  streakUnit,
 } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { cn, fieldErrors, useFocusAfterTransition, useToday, WEEKDAY_KO } from '@/shared/lib';
+import { cn, fieldErrors, gwaWa, useFocusAfterTransition, useToday, WEEKDAY_KO } from '@/shared/lib';
 import {
   ActionButton,
-  CARD_SHADOW,
   confirm,
+  FieldError,
   FormScreen,
   Icon,
   Input,
@@ -31,6 +37,7 @@ import {
   showToast,
   showUndo,
   Text,
+  useCardStyle,
   useColor,
   useSheetGuard,
 } from '@/shared/ui';
@@ -45,12 +52,12 @@ const FREQUENCIES = [
   ['weekly', '주 N회'],
 ] as const;
 const TIMES = (['1', '2', '3', '4', '5', '6'] as const).map((n) => [n, `${n}회`] as const);
-const STREAK_UNIT: Record<Frequency, string> = { daily: '일', weekdays: '회', weekly: '주' };
 
 // S06 습관 등록·편집(3-2-1). 완료 체크형, 주기는 매일·요일 지정·주 N회
 export function HabitEditPage({ id }: { id?: string }) {
   const db = useSQLiteContext();
   const c = useColor();
+  const card = useCardStyle();
   const today = useToday();
   const nameRef = useFocusAfterTransition(!id);
   const [habit, setHabit] = useState<Habit | null>(null);
@@ -82,18 +89,22 @@ export function HabitEditPage({ id }: { id?: string }) {
   }, [db, id]);
 
   const { close } = useSheetGuard(JSON.stringify([name, icon, startDate, frequency, weekdays, weeklyTarget]), loaded);
-  // 통계는 저장된 습관 기준(편집 중인 값이 아니라)
+  // 통계는 저장된 습관 기준(편집 중인 값이 아니라). 단위는 배지와 같은 일·주
   const stats = habit
     ? (() => {
         const done = new Set(logs.map((l) => l.log_date));
         const st = streak(habit, done, today);
-        const unit = STREAK_UNIT[habit.frequency_type as Frequency] ?? '일';
+        const unit = streakUnit(habit);
         const rate = habitRate30(habit, done, today);
-        return [
-          ['현재 연속', `${st.current}${unit}`],
-          ['최장 연속', `${st.longest}${unit}`],
-          ['최근 30일', rate == null ? '-' : `${rate}%`],
-        ] as const;
+        return {
+          current: st.current,
+          unit,
+          cells: [
+            ['현재 연속', `${st.current}${unit}`],
+            ['최장 연속', `${st.longest}${unit}`],
+            ['최근 30일', rate == null ? '-' : `${rate}%`],
+          ] as const,
+        };
       })()
     : null;
   const trimmed = name.trim();
@@ -103,7 +114,11 @@ export function HabitEditPage({ id }: { id?: string }) {
   const save = async () => {
     setAttempts(attempts + 1);
     const first = Object.values(errors)[0];
-    if (first) return showToast({ message: first, tone: 'error' });
+    if (first) {
+      // 이름 오류는 칸 아래 문구로 알린다. 칸이 없는 오류만 토스트
+      if (!errors.name) showToast({ message: first, tone: 'error' });
+      return;
+    }
     await saveHabit(db, id ?? null, {
       name: trimmed,
       icon_key: icon,
@@ -135,7 +150,7 @@ export function HabitEditPage({ id }: { id?: string }) {
     if (!habit) return;
     confirm({
       title: '습관을 삭제할까요?',
-      message: `'${habit.name}' 습관과 기록이 목록에서 사라져요.`,
+      message: `${gwaWa(`‘${habit.name}’`)} 지금까지의 기록이 모두 지워져요. 기록을 남기고 목록에서만 빼려면 보관을 고르세요.`,
       confirmLabel: '삭제',
       destructive: true,
     }).then(async (ok) => {
@@ -147,26 +162,43 @@ export function HabitEditPage({ id }: { id?: string }) {
   };
 
   return (
-    <FormScreen>
-      <SheetHeader onSave={save} />
-      <ListGroup className="px-0">
-        <View className="items-center gap-2.5 px-4 pt-5 pb-4" accessibilityLabel="미리보기">
-          <HabitChip iconKey={icon} size={64} />
-          <Text className={cn('text-center text-[20px] leading-7 font-semibold tracking-[-0.3px]', !trimmed && 'text-muted')}>
-            {trimmed || '습관 이름'}
-          </Text>
-        </View>
-        {stats && (
-          <View className="flex-row border-t-[0.5px] border-separator">
-            {stats.map(([label, value]) => (
-              <View key={label} className="flex-1 items-center gap-0.5 px-1 pt-3 pb-3.5">
+    <FormScreen header={<SheetHeader title={id ? '습관 편집' : '습관 추가'} onSave={save} />}>
+      {stats ? (
+        // 편집: 습관 이름 줄 + 통계 세 칸 + 지금 연속 기록 단계 카드
+        <ListGroup className="gap-3 py-4">
+          <View className="flex-row items-center gap-2.5" accessibilityLabel="미리보기">
+            <HabitChip iconKey={icon} size={32} />
+            <Text className={cn('flex-1 text-[17px] leading-6 font-semibold', !trimmed && 'text-muted')} numberOfLines={1}>
+              {trimmed || '습관 이름'}
+            </Text>
+          </View>
+          <View className="flex-row">
+            {stats.cells.map(([label, value]) => (
+              <View key={label} className="flex-1 items-center gap-0.5 px-1">
                 <Text className="text-[22px] leading-7 font-bold tracking-[-0.4px] tabular-nums">{value}</Text>
                 <Text className="text-[13px] leading-[18px] text-muted">{label}</Text>
               </View>
             ))}
           </View>
-        )}
-      </ListGroup>
+          <View className="flex-row items-center gap-3 rounded-2xl bg-surface-secondary px-3 py-2.5">
+            <StreakArt count={Math.max(stats.current, 1)} unit={stats.unit} size={48} loop />
+            <View className="flex-1">
+              <Text className="text-[15px] leading-5 font-semibold">{STAGE_NAME[streakStage(stats.current, stats.unit)]} 단계</Text>
+              <Text className="mt-0.5 text-[13px] leading-[18px] text-muted">{nextStageCopy(stats.current, stats.unit)}</Text>
+            </View>
+          </View>
+        </ListGroup>
+      ) : (
+        // 추가: 오늘 탭에 놓일 실제 타일 모양 그대로(키보드가 올라와도 아래 필드가 보이게 작게)
+        <ListGroup className="px-3 py-3">
+          <HabitTile
+            name={trimmed || '습관 이름'}
+            iconKey={icon}
+            state="todo"
+            accessory={<Text className="text-[12px] text-muted">오늘 탭에 이렇게 보여요</Text>}
+          />
+        </ListGroup>
+      )}
 
       <Section title="이름">
         <Input
@@ -179,12 +211,13 @@ export function HabitEditPage({ id }: { id?: string }) {
           invalid={!!shown.name}
           shakeKey={attempts}
         />
+        <FieldError message={shown.name} />
       </Section>
 
       <Pressable
         onPress={() => setPicking(true)}
         className="h-14 flex-row items-center gap-3 rounded-[20px] bg-card px-4 active:opacity-70"
-        style={c.raised ? CARD_SHADOW : undefined}
+        style={card}
         accessibilityRole="button"
         accessibilityLabel={`아이콘 고르기, 지금 ${iconLabel(icon)}`}
       >
@@ -210,21 +243,13 @@ export function HabitEditPage({ id }: { id?: string }) {
                 <Pressable
                   key={w}
                   onPress={() => setWeekdays(on ? weekdays.filter((x) => x !== i) : [...weekdays, i])}
-                  className={cn('h-11 flex-1 items-center justify-center rounded-full active:opacity-70', on ? 'bg-accent' : 'bg-card')}
-                  style={!on && c.raised ? CARD_SHADOW : undefined}
+                  // 그룹 칩과 같은 회색(sunken) 원, 고르면 베리
+                  className={cn('h-11 flex-1 items-center justify-center rounded-full active:opacity-70', on ? 'bg-accent' : 'bg-default')}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
                   accessibilityLabel={`${w}요일`}
                 >
-                  <Text
-                    className={cn(
-                      'text-[15px] font-semibold',
-                      on && 'text-accent-foreground',
-                      !on && i === 0 && 'text-danger-soft-foreground',
-                    )}
-                  >
-                    {w}
-                  </Text>
+                  <Text className={cn('text-[15px] font-semibold', on && 'text-accent-foreground')}>{w}</Text>
                 </Pressable>
               );
             })}

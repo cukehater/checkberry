@@ -27,6 +27,12 @@ const PRIORITY_LABEL: Record<number, string> = { 4: '높음', 5: '매우 높음'
 
 export type ScrollRef = React.RefObject<ComponentRef<typeof ScrollView> | null>;
 
+/**
+ * 날짜 줄을 보여 줄 범위. sameDay: 화면이 이미 그 날짜를 말하는 곳(오늘 탭, 캘린더 날짜 패널, 할 일 '오늘' 필터)이라
+ * 지연(D+n)과 여러 날 범위만 보인다. list: 할 일 탭의 나머지 필터. 다 보인다
+ */
+export type RowContext = 'sameDay' | 'list';
+
 // FR-12: 완료한 할 일이 아래로 가는 자리 이동(300ms, 바운스 없음). 기기의 동작 줄이기 설정을 따른다
 const LAYOUT = LinearTransition.duration(duration.move).reduceMotion(ReduceMotion.System);
 // 목록에서 빠지는 행(할 일 탭에서 완료)은 160ms 동안 흐려지고, 아래 행이 자리를 메운다
@@ -76,9 +82,11 @@ export function TaskRow({
   className,
   highlighted,
   scrollRef,
+  context = 'list',
 }: {
   task: EventRow;
   today: string;
+  context?: RowContext;
   onToggle: () => void;
   /** 길게 누르면 편집. 없으면 보기·완료만 하는 목록 */
   onPress?: () => void;
@@ -117,11 +125,12 @@ export function TaskRow({
     strike.set(reduce ? (done ? 1 : 0) : withTiming(done ? 1 : 0, { duration: duration.strike, easing: easing.standard }));
   }, [done, reduce, strike]);
   const bodyStyle = useAnimatedStyle(() => ({ opacity: 1 - 0.55 * strike.get() }));
-  // 마감 칩은 지남(D+n), 오늘(D-Day), 7일 안, 그 뒤 네 단계로 색을 바꾼다
+  // 마감 칩은 중립 회색, 지남(D+n)만 벽돌색
   const overdue = !done && !!d?.overdue;
-  // 화면 시안(Tasks·Main) 기준: 지남은 벽돌, 당일(기간 중 포함)은 옅은 베리, 나머지는 회색
-  const dTone = overdue ? 'danger' : d?.label === 'D-Day' ? 'accent' : 'default';
+  const multiDay = !!task.end_date && task.end_date !== task.start_date;
+  const showDate = context === 'list' || overdue || multiDay;
   const range =
+    showDate &&
     task.start_date &&
     (task.end_date && task.end_date !== task.start_date
       ? `${formatMD(task.start_date, today)} – ${formatMD(task.end_date, today)}`
@@ -131,7 +140,7 @@ export function TaskRow({
     <Animated.View layout={LAYOUT} exiting={EXIT}>
       {/* 왼쪽으로 끌면 삭제(확인 후). 카드 안쪽 여백(16)까지 차도록 -mx-4 */}
       <SwipeRow className="-mx-4" left={{ icon: 'trash', label: '삭제', tone: 'danger', onAction: () => removeTask(db, task) }}>
-        <Animated.View ref={ref} className={cn('min-h-[50px] flex-row items-center px-4', className)} style={glowStyle}>
+        <Animated.View ref={ref} className={cn('min-h-12 flex-row items-center px-4', className)} style={glowStyle}>
           {/* FR-05: 행을 누르면 완료 토글, 길게 누르면 편집 */}
           <Check
             done={done}
@@ -139,7 +148,7 @@ export function TaskRow({
             onLongPress={onPress}
             label={`${task.title} 완료`}
             hint={onPress ? '길게 누르면 편집해요' : undefined}
-            className="-ml-3 h-auto min-h-[50px] flex-1 flex-row items-start justify-start gap-3 self-stretch py-3 pl-3"
+            className="-ml-3 h-auto min-h-12 flex-1 flex-row items-start justify-start gap-3.5 self-stretch py-3 pl-3"
           >
             <Animated.View className="flex-1" style={bodyStyle}>
               <View>
@@ -158,7 +167,7 @@ export function TaskRow({
               {/* 끝낸 할 일은 날짜·반복·중요도를 숨긴다 */}
               {!done && (range || task.rrule) && (
                 <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
-                  {d && <Lozenge label={d.label} tone={dTone} size="sm" />}
+                  {d && showDate && <Lozenge label={d.label} tone={overdue ? 'danger' : 'default'} size="sm" />}
                   {range && (
                     <Text className={cn('text-[14px] leading-5', overdue ? 'text-danger-soft-foreground' : 'text-muted')}>{range}</Text>
                   )}

@@ -1,3 +1,4 @@
+import LottieView from 'lottie-react-native';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { type SharedValue, useAnimatedProps, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -6,11 +7,14 @@ import { duration, easing, RollingNumber, Text, useColor } from '@/shared/ui';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const VIEW = 140;
-const CENTER = 70;
-const STROKE = 14;
-const R_OUT = 63; // 습관
-const R_IN = 46; // 할 일
+// 모두 끝냈을 때 가운데 베리(Lottie 76)
+const DONE_BERRY = require('../../../../assets/lottie/done-berry.json');
+
+const VIEW = 128;
+const CENTER = 64;
+const STROKE = 13;
+const R_OUT = 56; // 습관
+const R_IN = 38; // 할 일
 const C_OUT = 2 * Math.PI * R_OUT;
 const C_IN = 2 * Math.PI * R_IN;
 
@@ -24,23 +28,26 @@ function useAnimatedRatio(target: number): SharedValue<number> {
 }
 
 /**
- * 오늘 진행률 이중 링. 바깥은 습관(강조색), 안쪽은 오늘 할 일(잎 초록), 가운데는 합친 완료율.
- * 모두 완료 연출은 TodayProgressCard가 카드 전체로 한다
+ * 오늘 진행률 이중 링(128). 바깥은 습관(베리), 안쪽은 오늘 할 일(잎 초록), 가운데는 합친 완료율.
+ * allDone이면 가운데 숫자 대신 베리 Lottie가 반복한다(동작 줄이기면 정지)
  */
 export function ProgressRings({
   habitsDone,
   habitsTotal,
   tasksDone,
   tasksTotal,
-  size = 140,
+  allDone,
+  size = 128,
 }: {
   habitsDone: number;
   habitsTotal: number;
   tasksDone: number;
   tasksTotal: number;
+  allDone: boolean;
   size?: number;
 }) {
   const c = useColor();
+  const reduce = useReducedMotion();
   const total = habitsTotal + tasksTotal;
   const done = habitsDone + tasksDone;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -89,13 +96,17 @@ export function ProgressRings({
       </Svg>
 
       <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
-        {/* 개수는 옆 범례가 보여 주므로 가운데는 퍼센트만. 바뀌면 숫자가 굴러간다(글자 크기는 기본 size 140 기준) */}
-        <View className="flex-row items-end">
-          <RollingNumber value={pct} className="text-[30px] leading-[34px] font-bold tracking-[-1px]" />
-          <Text className="mb-[3px] font-semibold" style={{ fontSize: size * 0.107 }} maxFontSizeMultiplier={1.3}>
-            %
-          </Text>
-        </View>
+        {allDone ? (
+          <LottieView key={String(reduce)} source={DONE_BERRY} autoPlay={!reduce} loop={!reduce} style={{ width: 76, height: 76 }} />
+        ) : (
+          // 개수는 옆 범례가 보여 주므로 가운데는 퍼센트만. 바뀌면 숫자가 굴러간다
+          <View className="flex-row items-end">
+            <RollingNumber value={pct} className="text-[30px] leading-[34px] font-bold tracking-[-0.5px]" />
+            <Text className="mb-[3px] text-[15px] font-semibold" maxFontSizeMultiplier={1.3}>
+              %
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

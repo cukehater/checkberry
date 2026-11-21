@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { Image, ScrollView, useColorScheme, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { pickAndRestore } from '@/features/backup';
 import { loadTheme } from '@/features/theme';
 import { setSetting } from '@/shared/db';
@@ -24,6 +25,9 @@ export function WelcomePage() {
   const db = useSQLiteContext();
   const c = useColor();
   const dark = useColorScheme() === 'dark';
+  // 아래 버튼 묶음 높이. 꾸밈 배경을 그 24pt 위에서 끝내 베리 그림이 '시작하기'와 겹치지 않게 한다
+  const [footer, setFooter] = useState(0);
+  const bottomInset = useSafeAreaInsets().bottom;
   const start = async () => {
     await setSetting(db, 'onboarded', '1');
     router.replace('/');
@@ -32,7 +36,16 @@ export function WelcomePage() {
   return (
     <View className="flex-1 bg-background">
       {/* 다크 모드는 BrandSplash처럼 배경 그림 없이 바탕색만 */}
-      {!dark && <Image source={BG} className="absolute inset-0 h-full w-full" resizeMode="cover" accessibilityIgnoresInvertColors />}
+      {!dark && footer > 0 && (
+        // 배경 영역의 위치는 잰 값이라 style로 준다
+        <Image
+          source={BG}
+          className="absolute top-0 right-0 left-0"
+          style={{ bottom: footer + bottomInset + 24 }}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+        />
+      )}
       <SafeAreaView style={{ flex: 1 }}>
         {/* 앱 아이콘과 이름, 소개, 카드에 담은 기능 목록, 맨 아래 주 버튼과 회색 버튼 */}
         <ScrollView className="flex-1" contentContainerClassName="px-5 pt-12 pb-6">
@@ -77,7 +90,7 @@ export function WelcomePage() {
           </Animated.View>
         </ScrollView>
 
-        <View className="gap-2 px-5 pb-2">
+        <View className="gap-2 px-5 pb-2" onLayout={(e) => setFooter(e.nativeEvent.layout.height)}>
           <ActionButton label="시작하기" size="lg" onPress={start} />
           <ActionButton
             label="백업 파일로 복원"

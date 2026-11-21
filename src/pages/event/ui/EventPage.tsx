@@ -1,15 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 import { createGroup, EVENT_SQL, type EventRow, type Group, type Repeat, restoreEvent, saveEvent, softDeleteEvent } from '@/entities/event';
 import { useQuery } from '@/shared/db';
-import { addDays, fieldErrors, formatDateTime, formatMD, useFocusAfterTransition, useToday } from '@/shared/lib';
+import { addDays, fieldErrors, formatDateTime, formatMD, iGa, useFocusAfterTransition, useToday } from '@/shared/lib';
 import {
   ActionButton,
-  CARD_SHADOW,
   confirm,
   Chip,
+  FieldError,
   FormScreen,
   Icon,
   Input,
@@ -19,6 +19,7 @@ import {
   showToast,
   showUndo,
   Text,
+  useCardStyle,
   useColor,
   useSheetGuard,
 } from '@/shared/ui';
@@ -49,6 +50,7 @@ const PRIORITY_NAME = ['', '매우 낮음', '낮음', '보통', '높음', '매�
 export function EventPage() {
   const db = useSQLiteContext();
   const c = useColor();
+  const card = useCardStyle();
   const today = useToday();
   const params = useLocalSearchParams<{ id?: string; date?: string }>();
   const tomorrow = addDays(today, 1);
@@ -95,7 +97,11 @@ export function EventPage() {
   const save = async () => {
     setAttempts(attempts + 1);
     const first = Object.values(errors)[0];
-    if (first) return showToast({ message: first, tone: 'error' });
+    if (first) {
+      // 제목 오류는 칸 아래 문구로 알린다. 칸이 없는 오류만 토스트
+      if (!errors.title) showToast({ message: first, tone: 'error' });
+      return;
+    }
     const gid = newGroup.trim() ? await createGroup(db, newGroup.trim()) : groupId;
     const savedId = await saveEvent(
       db,
@@ -121,7 +127,12 @@ export function EventPage() {
 
   const remove = () => {
     if (!ev) return;
-    confirm({ title: '할 일을 삭제할까요?', message: `'${ev.title}'`, confirmLabel: '삭제', destructive: true }).then(async (ok) => {
+    confirm({
+      title: '할 일을 삭제할까요?',
+      message: `${iGa(`‘${ev.title}’`)} 목록에서 지워져요.`,
+      confirmLabel: '삭제',
+      destructive: true,
+    }).then(async (ok) => {
       if (!ok) return;
       await softDeleteEvent(db, ev.id);
       close();
@@ -130,8 +141,7 @@ export function EventPage() {
   };
 
   return (
-    <FormScreen>
-      <SheetHeader onSave={save} />
+    <FormScreen header={<SheetHeader title={params.id ? '할 일 편집' : '할 일 추가'} onSave={save} />}>
       <Section title="제목">
         <Input
           value={title}
@@ -143,12 +153,14 @@ export function EventPage() {
           invalid={!!shown.title}
           shakeKey={attempts}
         />
+        <FieldError message={shown.title} />
       </Section>
 
       <Section title="날짜">
         <Segmented
           options={QUICK}
-          value={start === '' ? 'none' : start === today ? 'today' : start === tomorrow ? 'tomorrow' : ''}
+          // 오늘·내일이 아닌 날짜면 고른 칸을 두지 않는다(실제 날짜와 다른 칸이 선택돼 보이지 않게)
+          value={start === '' ? 'none' : start === today ? 'today' : start === tomorrow ? 'tomorrow' : null}
           onChange={(q) => {
             if (q === 'none') return (setStart(''), setEnd(''), setRrule(null));
             const d = q === 'today' ? today : tomorrow;
@@ -159,7 +171,7 @@ export function EventPage() {
       </Section>
 
       <View className="gap-1.5">
-        <View className="rounded-[20px] bg-card" style={c.raised ? CARD_SHADOW : undefined}>
+        <View className="rounded-[20px] bg-card" style={card}>
           <DateRow
             label="시작일"
             value={start}
@@ -180,21 +192,8 @@ export function EventPage() {
               min={start}
               range={end ? { start, end } : undefined}
               onChange={setEnd}
-              tone="neutral"
+              onClear={end !== '' ? () => setEnd('') : undefined}
               divider
-              trailing={
-                end !== '' && (
-                  <Pressable
-                    onPress={() => setEnd('')}
-                    hitSlop={6}
-                    className="h-8 w-8 items-center justify-center rounded-full bg-default active:opacity-70"
-                    accessibilityRole="button"
-                    accessibilityLabel="종료일 지우기"
-                  >
-                    <Icon name="close" size={12} tint={c.sub} />
-                  </Pressable>
-                )
-              }
             />
           )}
         </View>
@@ -207,12 +206,13 @@ export function EventPage() {
       )}
 
       {/* FR-10: 중요도·그룹·메모는 처음부터 보인다 */}
-      <Section>
-        <View className="flex-row items-baseline justify-between px-1">
-          <Text className="text-[14px] leading-5 font-medium">중요도</Text>
-          <Text className="text-[14px] leading-5 text-muted">{PRIORITY_NAME[priority]}</Text>
-        </View>
-        <Segmented options={PRIORITIES} value={String(priority)} onChange={(v) => setPriority(Number(v))} />
+      <Section title="중요도" value={PRIORITY_NAME[priority]}>
+        <Segmented
+          options={PRIORITIES}
+          value={String(priority)}
+          onChange={(v) => setPriority(Number(v))}
+          captions={['낮음', '매우 높음']}
+        />
       </Section>
 
       <Section title="그룹">
@@ -246,7 +246,7 @@ export function EventPage() {
       </Section>
 
       {ev && (
-        <View className="min-h-14 flex-row items-center rounded-[20px] bg-card px-4 py-2" style={c.raised ? CARD_SHADOW : undefined}>
+        <View className="min-h-14 flex-row items-center rounded-[20px] bg-card px-4 py-2" style={card}>
           <View className="flex-1">
             <Text className="text-[16px] leading-[22px] font-medium">완료</Text>
             {/* FR-03: 완료 시각과, 일찍 끝내서 줄어든 경우 원래 예정 기간 */}

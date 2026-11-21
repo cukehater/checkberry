@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Text as RNText, TextInput } from 'react-native';
+import { Text as RNText, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { cn } from '../lib/utils';
+import { GravityIcon } from './GravityIcon';
 import { haptic } from './motion';
 import { useColor } from './theme';
 
@@ -13,7 +14,7 @@ export function Text({ className, ...props }: React.ComponentProps<typeof RNText
 }
 
 /**
- * 입력창. 48pt 흰 칸, 1pt 테두리, 모서리 14. 입력 중이면 1.5pt 강조색 테두리, invalid면 벽돌색 테두리.
+ * 입력창. 52pt 흰 칸, 1pt 테두리, 모서리 14. 입력 중이면 1.5pt 강조색 테두리, invalid면 1.5pt 오류 테두리(아래에 FieldError).
  * invalid가 켜질 때와, invalid인 채로 shakeKey가 바뀔 때(저장을 다시 누름) 좌우로 3번 흔들리고(240ms) 경고 햅틱이 울린다.
  * 동작 줄이기면 흔들림 없이 햅틱만. multiline이면 위에서부터 쓴다
  */
@@ -42,9 +43,9 @@ export function Input({
     <AnimatedTextInput
       lineBreakStrategyIOS="hangul-word"
       className={cn(
-        'min-h-12 rounded-[14px] border border-field-border bg-field px-3.5 text-[16px] font-normal text-foreground',
+        'min-h-[52px] rounded-[14px] border border-field-border bg-field px-4 text-[16px] font-normal text-foreground',
         focused && 'border-[1.5px] border-accent',
-        invalid && 'border-[1.5px] border-danger',
+        invalid && 'border-[1.5px] border-danger-line',
         multiline && 'min-h-24 pt-3 pb-3',
         className,
       )}
@@ -57,5 +58,17 @@ export function Input({
       {...props}
       style={[props.style, shake]}
     />
+  );
+}
+
+/** 입력칸 아래 8pt 오류 문구. 원 느낌표 15 + 13 SemiBold, 오류 글자색 */
+export function FieldError({ message }: { message?: string }) {
+  const c = useColor();
+  if (!message) return null;
+  return (
+    <View className="mt-0 flex-row items-center gap-1.5 px-1" accessibilityLiveRegion="polite">
+      <GravityIcon name="circle-exclamation" size={15} color={c.dangerInk} />
+      <Text className="text-[13px] leading-[18px] font-semibold text-danger-soft-foreground">{message}</Text>
+    </View>
   );
 }

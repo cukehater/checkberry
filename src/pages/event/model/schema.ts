@@ -5,7 +5,7 @@ const date = z.string().refine(isDateStr, '날짜 형식이 맞지 않아요.');
 
 export const eventSchema = z
   .object({
-    title: z.string().trim().min(1, '제목을 입력해 주세요.').max(200, '제목은 200자까지 쓸 수 있어요.'),
+    title: z.string().trim().min(1, '제목을 적어 주세요.').max(200, '제목은 200자까지 쓸 수 있어요.'),
     start: date.or(z.literal('')),
     end: date.or(z.literal('')),
   })

@@ -1,78 +1,102 @@
-import LottieView from 'lottie-react-native';
+import LottieView, { type AnimationObject } from 'lottie-react-native';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { cn } from '@/shared/lib';
-import { RollingNumber, Text } from '@/shared/ui';
+import { RollingNumber, Text, useColor } from '@/shared/ui';
+import { STAGE_NAME, type StreakStage, streakStage, type StreakUnit } from '../model/stage';
 
-const FLAME = require('../../../../assets/lottie/flame.json');
+// 단계 그림(Lottie 128 캔버스, 2초 반복). 얼음 → 물방울 → 불씨 → 불꽃 → 활활
+const STAGE_LOTTIE: Record<StreakStage, AnimationObject> = {
+  1: require('../../../../assets/lottie/streak-1-ice.json'),
+  2: require('../../../../assets/lottie/streak-2-drop.json'),
+  3: require('../../../../assets/lottie/streak-3-ember.json'),
+  4: require('../../../../assets/lottie/streak-4-flame.json'),
+  5: require('../../../../assets/lottie/streak-5-blaze.json'),
+};
+
+// 단계 알약 바탕과 글자. 얼음 frost, 물방울 회색, 불씨 호박(ember), 불꽃 베리 soft, 활활 베리 채움. 벽돌(지연)은 쓰지 않는다
+const STAGE_PILL: Record<StreakStage, readonly [string, string]> = {
+  1: ['bg-frost-soft', 'text-frost-soft-foreground'],
+  2: ['bg-default', 'text-default-foreground'],
+  3: ['bg-warning-soft', 'text-warning-soft-foreground'],
+  4: ['bg-accent-soft', 'text-accent-soft-foreground'],
+  5: ['bg-accent', 'text-accent-foreground'],
+};
 
 /**
- * 연속 일수 → 5단계. 위에서부터 처음 맞는 단계. 처음 며칠은 작고 흐린 불씨라 이어 갈수록 불이 커지는 재미가 생긴다.
- * 불꽃 크기·재생 속도·선명도와 알약 바탕이 함께 달아오른다: 회색 → 호박 soft → 주황 soft → 베리 soft → 베리 채움.
- * 색은 바꾸지 않는다(Lottie colorFilters는 같은 소스를 쓰는 다른 불꽃에까지 남는다)
+ * 단계 그림. 목록에서는 첫 프레임에 멈춰 두고 playKey가 바뀐 순간(체크)에만 한 번 재생한다. loop면 계속 돈다(습관 편집 단계 카드).
+ * 동작 줄이기면 항상 첫 프레임
  */
-const STAGES = [
-  { min: 14, flame: 22, speed: 1.6, opacity: 1, pill: 'bg-accent', text: 'text-accent-foreground' }, // 활활
-  { min: 7, flame: 20, speed: 1.2, opacity: 1, pill: 'bg-accent-soft', text: 'text-accent-soft-foreground' }, // 큰불
-  { min: 3, flame: 18, speed: 0.9, opacity: 1, pill: 'bg-danger-soft', text: 'text-danger-soft-foreground' }, // 불꽃(주황)
-  { min: 1, flame: 16, speed: 0.6, opacity: 0.8, pill: 'bg-warning-soft', text: 'text-warning-soft-foreground' }, // 불씨(호박)
-  { min: 0, flame: 14, speed: 0.35, opacity: 0.45, pill: 'bg-default', text: 'text-muted' }, // 잿불
-] as const;
-
-const stageOf = (count: number) => STAGES.find((s) => count >= s.min) ?? STAGES[STAGES.length - 1];
-
-/** 단계에 맞는 Lottie 불꽃. scale로 칸 크기에 맞춰 키운다(알약 1, 토스트 칩 1.3) */
-function Flame({ count, scale = 1 }: { count: number; scale?: number }) {
+export function StreakArt({
+  count,
+  unit,
+  size,
+  playKey = 0,
+  loop,
+}: {
+  count: number;
+  unit: StreakUnit;
+  size: number;
+  playKey?: number;
+  loop?: boolean;
+}) {
   const reduce = useReducedMotion();
-  const stage = stageOf(count);
-  const size = Math.round(stage.flame * scale);
+  const ref = useRef<LottieView>(null);
+  const stage = streakStage(count, unit);
+  useEffect(() => {
+    if (reduce || (!loop && !playKey)) ref.current?.reset();
+    else ref.current?.play();
+  }, [playKey, loop, reduce, stage]);
   return (
-    <LottieView
-      // 단계·동작 줄이기가 바뀌면 새로 그려 autoPlay·speed를 다시 적용한다
-      key={`${stage.min}-${reduce}`}
-      source={FLAME}
-      autoPlay={!reduce}
-      loop={!reduce}
-      speed={stage.speed}
-      progress={reduce ? 0 : undefined}
-      // 캔버스 안 불꽃 몸통이 아래로 치우쳐 있어(실측: 크기의 약 18%) 그만큼 올려 숫자와 세로 중심을 맞춘다
-      style={{ width: size, height: size, opacity: stage.opacity, transform: [{ translateY: -Math.round(size * 0.18) }] }}
-    />
+    <LottieView ref={ref} source={STAGE_LOTTIE[stage]} autoPlay={false} loop={!!loop && !reduce} style={{ width: size, height: size }} />
   );
 }
 
-/** 연속 기록 축하 토스트의 왼쪽 칩. 단계 알약 색 원 안에 같은 단계 불꽃 */
-export function StreakToastIcon({ count }: { count: number }) {
+/** 연속 기록 축하 토스트의 왼쪽 칩. 단계 알약 색 원 안에서 같은 단계 그림이 한 번 재생된다 */
+export function StreakToastIcon({ count, unit }: { count: number; unit: StreakUnit }) {
   return (
-    <View className={cn('h-8 w-8 items-center justify-center rounded-full', stageOf(count).pill)}>
-      <Flame count={count} scale={1.3} />
+    <View className={cn('h-8 w-8 items-center justify-center rounded-full', STAGE_PILL[streakStage(count, unit)][0])}>
+      <StreakArt count={count} unit={unit} size={28} playKey={1} />
     </View>
   );
 }
 
 /**
- * 연속 기록 알약: [불꽃][숫자][단위]. 오른쪽 고정 폭 칸이라 단계가 바뀌어도 줄이 흔들리지 않는다.
- * 오늘 타일(sm)과 습관 탭(md)이 같은 표현을 쓴다
+ * 연속 기록 메달 배지. 알약(26pt, 숫자 15 Bold + 단위 12 SemiBold) 왼쪽 끝에 메달 원(32)이 15pt 밖, 3pt 위로 겹친다.
+ * 메달 원 바탕은 배지가 놓인 면 색(습관 타일 위면 tile, 흰 카드 위면 card)이라 그림이 면에서 떠 보인다. 0이면 그리지 않는다
  */
-export function StreakBadge({ count, unit, size = 'sm' }: { count: number; unit: '일' | '회' | '주'; size?: 'sm' | 'md' }) {
-  const stage = stageOf(count);
-  const md = size === 'md';
+export function StreakBadge({
+  count,
+  unit,
+  surface = 'tile',
+  playKey,
+}: {
+  count: number;
+  unit: StreakUnit;
+  surface?: 'tile' | 'card';
+  /** 바뀐 순간 메달 그림을 한 번 재생한다(체크한 순간) */
+  playKey?: number;
+}) {
+  const c = useColor();
+  if (count <= 0) return null;
+  const stage = streakStage(count, unit);
+  const [bg, text] = STAGE_PILL[stage];
   return (
     <View
-      className={cn(
-        'h-7 flex-row items-center justify-center gap-0.5 rounded-full pr-2.5 pl-1.5',
-        md ? 'min-w-16' : 'min-w-[60px]',
-        stage.pill,
-      )}
+      className={cn('ml-[15px] h-[26px] flex-row items-center self-center rounded-full pr-2.5 pl-[21px]', bg)}
       accessible
-      accessibilityLabel={count ? `${count}${unit} 연속` : '연속 기록 없음'}
+      accessibilityLabel={`연속 ${count}${unit}, ${STAGE_NAME[stage]} 단계`}
     >
-      {/* 불꽃 칸은 단계와 상관없이 같은 크기라 숫자 자리가 움직이지 않는다 */}
-      <View className="h-5 w-5 items-center justify-center">
-        <Flame count={count} />
+      {/* 메달 원은 계산된 면 색이라 style로 준다 */}
+      <View
+        className="absolute top-[-3px] left-[-15px] h-8 w-8 items-center justify-center rounded-full"
+        style={{ backgroundColor: surface === 'tile' ? c.cardSoft : c.card }}
+      >
+        <StreakArt count={count} unit={unit} size={28} playKey={playKey} />
       </View>
-      <RollingNumber value={count} className={cn('text-[14px] leading-[18px] font-bold', stage.text)} />
-      <Text className={cn('text-[11px] leading-[18px] font-semibold', stage.text)}>{unit}</Text>
+      <RollingNumber value={count} className={cn('text-[15px] leading-[18px] font-bold', text)} />
+      <Text className={cn('ml-0.5 text-[12px] leading-[18px] font-semibold', text)}>{unit}</Text>
     </View>
   );
 }
