@@ -61,4 +61,11 @@ describe('30일 달성률', () => {
     // 4주(10-22~11-18) 동안 6회 / 12회
     expect(habitRate30(weekly3, done, '2026-11-18')).toBe(50);
   });
+  test('주 N회 습관: 시작한 지 4주가 안 되면 지난 주 수로만 나눈다', () => {
+    const weekly2 = { ...base, frequency_type: 'weekly', weekly_target: 2 };
+    // 오늘 시작, 1회 / 1주 × 2회
+    expect(habitRate30({ ...weekly2, start_date: '2026-11-18' }, set('2026-11-18'), '2026-11-18')).toBe(50);
+    // 10일 전 시작(2주), 2회 / 2주 × 2회
+    expect(habitRate30({ ...weekly2, start_date: '2026-11-09' }, set('2026-11-10', '2026-11-17'), '2026-11-18')).toBe(50);
+  });
 });

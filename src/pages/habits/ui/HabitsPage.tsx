@@ -62,7 +62,8 @@ export function HabitsPage() {
   const [pressed, setPressed] = useState<string | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const allHabits = useQuery<Habit>(HABIT_SQL.allHabits);
-  const habits = allHabits.filter((h) => days.some((d) => isScheduled(h, d)));
+  // 보관한 습관은 예정일이 없어도 남겨 둔다(편집 시트에서 보관 해제하는 길)
+  const habits = allHabits.filter((h) => days.some((d) => isScheduled(h, d)) || (!!h.archived_on && h.start_date <= days[6]));
   // 지난주와 견주려고 한 주 앞까지 읽는다
   const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(start, -7), days[6]]);
   // 연속 기록은 보고 있는 주와 상관없이 오늘 기준. 전체 기록 대신 오늘 탭과 같은 기간만 읽는다

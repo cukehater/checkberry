@@ -1,4 +1,4 @@
-import { addDays, type DateStr, weekday, weekStart } from '@/shared/lib';
+import { addDays, type DateStr, diffDays, weekday, weekStart } from '@/shared/lib';
 
 export type HabitLike = {
   id: string;
@@ -101,9 +101,11 @@ export function streak(habit: HabitLike, doneDates: Set<DateStr>, today: DateStr
 export function habitRate30(habit: HabitLike, doneDates: Set<DateStr>, today: DateStr): number | null {
   if (isWeekly(habit)) {
     if (habit.start_date > today) return null;
+    // 최근 4주 중 시작일 이후만 센다. 시작한 지 얼마 안 됐으면 지난 주 수만큼만 목표로 잡는다
+    const days = Math.min(28, diffDays(habit.start_date, today) + 1);
     let n = 0;
-    for (let i = 0; i < 28; i++) if (doneDates.has(addDays(today, -i))) n++;
-    return Math.min(100, Math.round((n / (target(habit) * 4)) * 100));
+    for (let i = 0; i < days; i++) if (doneDates.has(addDays(today, -i))) n++;
+    return Math.min(100, Math.round((n / (target(habit) * Math.ceil(days / 7))) * 100));
   }
   let scheduled = 0;
   let done = 0;
