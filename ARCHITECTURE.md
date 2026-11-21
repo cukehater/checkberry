@@ -58,7 +58,7 @@ import는 위에서 아래로만 한다. `pages`는 `features`, `entities`, `sha
 ## 데이터
 
 - 저장소는 기기 내 `expo-sqlite`다. 스키마는 `shared/db/schema.ts`의 `MIGRATIONS` 배열이고, 기존 항목은 고치지 않고 끝에 추가만 한다.
-- 화면 조회는 `useQuery(sql, params)`를 쓴다. DB가 바뀌면 자동으로 다시 읽는다.
+- 화면 조회는 `useQuery(sql, params)`를 쓴다. SQL의 `FROM`·`JOIN` 테이블이 바뀔 때만 다시 읽고, 결과가 같으면 리렌더하지 않는다(탭이 모두 마운트돼 있어 체크 한 번에 모든 조회가 깨어나기 때문). 서브쿼리나 뷰로 다른 테이블을 읽는 SQL을 쓰면 `tablesOf`가 그 테이블도 잡는지 확인한다.
 - 삭제는 `deleted_at`을 채우는 soft delete다. 조회 쿼리는 `deleted_at IS NULL`로 거른다.
 - 폼 검증은 페이지 `model/schema.ts`의 zod 스키마와 `fieldErrors`(`shared/lib`)로 한다. 저장을 처음 누른 뒤부터 필드 아래에 메시지를 보여 준다.
 
