@@ -65,6 +65,7 @@ const ICONS = {
   download: ['arrow-down-to-square', 'arrow-down-to-square'],
   trash: ['trash-bin', 'trash-bin'],
   close: ['xmark', 'xmark'],
+  smile: ['face-smile', 'face-smile'],
   export: ['file-arrow-down', 'file-arrow-down'],
   alert: ['circle-exclamation-fill', 'circle-exclamation-fill'],
 } satisfies Record<string, readonly [GravityIconName, GravityIconName]>;
@@ -264,11 +265,12 @@ export function IconChip({ name, size = 32, tone = 'accent' }: { name: IconName;
 
 /**
  * 아이콘 버튼. 40pt 원형 칩(누르는 영역 44pt), 누르면 살짝 줄어든다. 나란히 둘 때는 gap-1(칩 사이 8pt).
- * accent는 옅은 강조색 면 + 강조색 아이콘(주 동작), neutral은 회색 면 + 글자색 아이콘.
+ * accent는 옅은 강조색 면 + 강조색 아이콘(주 동작), neutral은 회색 면 + 글자색 아이콘. glyph(이모지 등 글자)를 주면 아이콘 대신 그린다.
  * Link asChild 안에서도 쓰도록 나머지 Pressable props를 그대로 넘긴다
  */
 export function IconButton({
   name,
+  glyph,
   tone = 'neutral',
   size = 18,
   accessibilityLabel,
@@ -276,6 +278,7 @@ export function IconButton({
   ...props
 }: Omit<React.ComponentProps<typeof Pressable>, 'children' | 'style'> & {
   name: IconName;
+  glyph?: string;
   tone?: 'accent' | 'neutral';
   size?: number;
   accessibilityLabel: string;
@@ -295,7 +298,11 @@ export function IconButton({
         className={cn('h-10 w-10 items-center justify-center rounded-full', tone === 'accent' ? 'bg-accent-soft' : 'bg-default')}
         style={press.style}
       >
-        <Icon name={name} size={size} tint={tone === 'accent' ? c.accent : c.text} />
+        {glyph ? (
+          <Text className="text-[22px]">{glyph}</Text>
+        ) : (
+          <Icon name={name} size={size} tint={tone === 'accent' ? c.accent : c.text} />
+        )}
       </Animated.View>
     </Pressable>
   );

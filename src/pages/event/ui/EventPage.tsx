@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import {
   createGroup,
   EVENT_SQL,
@@ -24,6 +24,7 @@ import {
   FieldError,
   FormScreen,
   Icon,
+  IconButton,
   Input,
   Section,
   Segmented,
@@ -36,8 +37,10 @@ import {
   useColor,
   useSheetGuard,
 } from '@/shared/ui';
+import { joinEmoji, splitEmoji } from '../model/emoji';
 import { eventSchema } from '../model/schema';
 import { DateRow } from './DateRow';
+import type { EmojiSheet as EmojiSheetType } from './EmojiSheet';
 
 const REPEATS = [
   ['none', '안 함'],
@@ -65,6 +68,10 @@ export function EventPage() {
   const groups = useQuery<Group>(EVENT_SQL.groups);
 
   const [ev, setEv] = useState<EventRow | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emoji, setEmoji] = useState('');
+  // 처음 열 때 불러온 선택 창. 닫는 애니메이션을 위해 한 번 불러오면 계속 둔다
+  const [EmojiSheet, setEmojiSheet] = useState<typeof EmojiSheetType | null>(null);
   const [title, setTitle] = useState('');
   const [start, setStart] = useState(params.date ?? '');
   const [end, setEnd] = useState('');
@@ -84,7 +91,9 @@ export function EventPage() {
     db.getFirstAsync<EventRow>('SELECT * FROM events WHERE id = ?', params.id).then((e) => {
       if (!e) return;
       setEv(e);
-      setTitle(e.title);
+      const parts = splitEmoji(e.title);
+      setEmoji(parts.emoji);
+      setTitle(parts.rest);
       setStart(e.start_date ?? '');
       setEnd(e.end_date && e.end_date !== e.start_date ? e.end_date : '');
       // 예전 5단계 값(2·4)은 가까운 단계로 맞춘다
@@ -97,7 +106,17 @@ export function EventPage() {
     });
   }, [db, params.id]);
 
-  const { close } = useSheetGuard(JSON.stringify([title, start, end, priority, groupId, newGroup, description, completed, rrule]), loaded);
+  const openEmoji = () => {
+    Keyboard.dismiss();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- 이모지 데이터(약 230KB)는 import하면 앱 시작 때 평가돼서 처음 누를 때로 미룬다
+    setEmojiSheet(() => require('./EmojiSheet').EmojiSheet);
+    setEmojiOpen(true);
+  };
+
+  const { close } = useSheetGuard(
+    JSON.stringify([emoji, title, start, end, priority, groupId, newGroup, description, completed, rrule]),
+    loaded,
+  );
 
   const errors = fieldErrors(eventSchema, { title, start, end });
   const shown = attempts ? errors : {};
@@ -115,7 +134,7 @@ export function EventPage() {
       db,
       ev?.id ?? null,
       {
-        title: title.trim(),
+        title: joinEmoji(emoji, title.trim()),
         description: description.trim() || null,
         start_date: start || null,
         end_date: start && end ? end : null,
@@ -150,17 +169,35 @@ export function EventPage() {
   return (
     <FormScreen header={<SheetHeader title={params.id ? '할 일 편집' : '할 일 추가'} onSave={save} />}>
       <Section title="제목">
-        <Input
-          value={title}
-          onChangeText={setTitle}
-          maxLength={200}
-          placeholder="무엇을 할까요?"
-          ref={titleRef}
-          accessibilityLabel="제목"
-          invalid={!!shown.title}
-          shakeKey={attempts}
-        />
+        <View className="flex-row items-center gap-1">
+          <IconButton
+            name="smile"
+            glyph={emoji || undefined}
+            onPress={openEmoji}
+            accessibilityLabel={emoji ? `이모지 ${emoji}, 바꾸기` : '이모지 고르기'}
+          />
+          <Input
+            className="flex-1"
+            value={title}
+            onChangeText={setTitle}
+            maxLength={200}
+            placeholder="무엇을 할까요?"
+            ref={titleRef}
+            accessibilityLabel="제목"
+            invalid={!!shown.title}
+            shakeKey={attempts}
+          />
+        </View>
         <FieldError message={shown.title} />
+        {EmojiSheet && (
+          <EmojiSheet
+            open={emojiOpen}
+            emoji={emoji}
+            onSelect={setEmoji}
+            onRemove={() => setEmoji('')}
+            onClose={() => setEmojiOpen(false)}
+          />
+        )}
       </Section>
 
       <Section title="날짜">

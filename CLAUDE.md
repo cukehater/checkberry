@@ -63,6 +63,7 @@ If none needs a change, say so in the commit report. `pnpm verify` runs prettier
 ## Data notes
 
 - Tables: `settings` (key/value), `task_groups`, `events` (dated or undated tasks, `start_date`/`end_date` as `YYYY-MM-DD`), `habits`, `habit_logs` (a row means done; unchecking deletes the row).
+- `events.title` may start with an emoji picked in the sheet, stored as `<emoji> <title>` in the same column; the sheet splits it back (`splitEmoji`/`joinEmoji` in `pages/event/model/emoji.ts`).
 - `events.priority` uses three levels stored as 1 (낮음), 3 (보통), 5 (높음); old 2/4 values are read by range (`priorityOf`). `habits.icon_key` is `ph:<Phosphor name>`; old keys are normalized on startup and after restore.
 - Dates are device-local calendar strings; date math in `src/shared/lib/dates.ts` parses them as UTC midnight to avoid DST issues.
 - `snapshot()` copies the whole DB file to `documents/snapshots/` (keeps 7) before migrations, restore, and wipe. Backups are JSON via the share sheet (`src/features/backup`).
