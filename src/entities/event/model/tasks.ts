@@ -33,6 +33,14 @@ export type TaskLike = {
   sort_order: number;
 };
 
+/** 할 일 탭 그룹: 미완료 먼저, 그다음 손으로 정한 순서(E-11) */
+export const byManualOrder = (a: TaskLike, b: TaskLike) =>
+  Number(!!a.completed_at) - Number(!!b.completed_at) || a.sort_order - b.sort_order;
+
+/** 오늘 탭 '오늘 할 일'·'날짜 없는 할 일': 미완료 먼저, 그다음 오늘 탭에서 정한 순서. 옛 백업을 복원해 모두 0이면 sort_order */
+export const byTodayOrder = (a: TaskLike & { today_order: number }, b: TaskLike & { today_order: number }) =>
+  Number(!!a.completed_at) - Number(!!b.completed_at) || a.today_order - b.today_order || a.sort_order - b.sort_order;
+
 /** E-10: 미완료 우선 → 날짜 오름차순(날짜 없음은 뒤) → 중요도 내림차순 → 수동 순서 */
 export function compareTasks(a: TaskLike, b: TaskLike): number {
   const done = Number(!!a.completed_at) - Number(!!b.completed_at);

@@ -1,11 +1,11 @@
 import { router, useScrollToTop } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import {
-  compareTasks,
+  byManualOrder,
   deleteGroup,
   EVENT_SQL,
   type EventRow,
@@ -19,7 +19,7 @@ import {
   useHighlight,
 } from '@/entities/event';
 import { useQuery } from '@/shared/db';
-import { cn, useToday } from '@/shared/lib';
+import { reorderIds, useToday } from '@/shared/lib';
 import {
   confirm,
   duration,
@@ -47,8 +47,6 @@ const FILTERS: (readonly [TaskFilter, string])[] = [
   ['done', '완료'],
 ];
 
-// 그룹은 노션 체크리스트처럼 손으로 정한 순서(E-11), 그룹 없는 항목은 E-10 정렬
-const byManualOrder = (a: EventRow, b: EventRow) => Number(!!a.completed_at) - Number(!!b.completed_at) || a.sort_order - b.sort_order;
 // 완료 탭은 최근에 끝낸 순서
 const byCompletedDesc = (a: EventRow, b: EventRow) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '');
 
@@ -65,7 +63,6 @@ export function TasksPage() {
   const today = useToday();
   const [filter, setFilter] = useState<TaskFilter>('all');
   const [closed, setClosed] = useState<Record<string, boolean>>({});
-  const [reorder, setReorder] = useState(false);
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState<Group | null>(null);
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
@@ -99,26 +96,24 @@ export function TasksPage() {
       id: 'none',
       // 화면 제목 '할 일'과 겹치지 않게. 시트의 그룹 칩 '없음'과 같은 뜻
       name: '그룹 없음',
-      items: events.filter((e) => !e.group_id).sort(filter === 'done' ? byCompletedDesc : compareTasks),
-      manual: false,
+      items: events.filter((e) => !e.group_id).sort(filter === 'done' ? byCompletedDesc : byManualOrder),
     },
     ...groups.map((g) => ({
       id: g.id,
       name: g.name,
       items: events.filter((e) => e.group_id === g.id).sort(filter === 'done' ? byCompletedDesc : byManualOrder),
-      manual: true,
     })),
   ].filter((sec) => sec.items.length > 0);
 
-  // 필터나 검색으로 일부만 보일 때 순서를 매기면 숨은 항목과 겹치므로 '전체'이고 검색어가 없을 때만 허용
-  const canReorder = filter === 'all' && !q && sections.some((sec) => sec.manual && sec.items.length > 1);
-  const reordering = reorder && canReorder;
-
-  const move = (items: EventRow[], i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= items.length) return;
-    const ids = items.map((e) => e.id);
-    [ids[i], ids[j]] = [ids[j], ids[i]];
+  // 끌어 옮긴 결과를 그 그룹 전체(필터·검색으로 숨은 항목 포함)에 적용한다. 숨은 항목끼리의 순서는 그대로다(E-11)
+  const reorderIn = (groupId: string | null, visible: EventRow[], from: number, to: number) => {
+    const full = allEvents.filter((e) => e.group_id === groupId).sort(byManualOrder);
+    const ids = reorderIds(
+      full.map((e) => e.id),
+      visible.map((e) => e.id),
+      from,
+      to,
+    );
     setOrder(db, ids);
   };
 
@@ -167,20 +162,6 @@ export function TasksPage() {
                   <Lozenge size="lg" label={`남은 할 일 ${remaining}개`} />
                   {overdueCount > 0 && <Lozenge size="lg" tone="danger" label={`지연 ${overdueCount}`} />}
                 </>
-              )
-            }
-            accessory={
-              canReorder && (
-                <Pressable
-                  onPress={() => setReorder(!reorder)}
-                  className={cn('h-9 justify-center rounded-full px-3.5 active:opacity-60', reordering ? 'bg-accent' : 'bg-default')}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: reordering }}
-                >
-                  <Text className={cn('text-[14px] font-semibold', reordering ? 'text-accent-foreground' : 'text-foreground')}>
-                    {reordering ? '완료' : '순서 바꾸기'}
-                  </Text>
-                </Pressable>
               )
             }
           />
@@ -234,26 +215,8 @@ export function TasksPage() {
                     onOpen={(e) => router.push({ pathname: '/event', params: { id: e.id } })}
                     highlight={highlight}
                     scrollRef={scrollRef}
-                    right={(e, i) =>
-                      reordering && sec.manual ? (
-                        <View className="flex-row gap-1 pl-2">
-                          <Pressable
-                            onPress={() => move(sec.items, i, -1)}
-                            className="h-9 w-9 items-center justify-center rounded-full bg-default active:opacity-60"
-                            accessibilityLabel={`${e.title} 위로`}
-                          >
-                            <Icon name="arrow-up" size={15} tint={c.text} />
-                          </Pressable>
-                          <Pressable
-                            onPress={() => move(sec.items, i, 1)}
-                            className="h-9 w-9 items-center justify-center rounded-full bg-default active:opacity-60"
-                            accessibilityLabel={`${e.title} 아래로`}
-                          >
-                            <Icon name="arrow-down" size={15} tint={c.text} />
-                          </Pressable>
-                        </View>
-                      ) : undefined
-                    }
+                    // 완료 필터는 끝낸 순서라 옮기지 않는다
+                    onReorder={filter === 'done' ? undefined : (from, to) => reorderIn(group?.id ?? null, sec.items, from, to)}
                   />
                 </GroupCard>
               </Animated.View>

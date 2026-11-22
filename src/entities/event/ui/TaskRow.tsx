@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { cn, formatMD } from '@/shared/lib';
-import { Check, duration, EASE, easing, Icon, Lozenge, SwipeRow, Text, useColor, useMotion } from '@/shared/ui';
+import { type A11yAction, Check, duration, EASE, easing, Icon, Lozenge, SwipeRow, Text, useColor, useMotion } from '@/shared/ui';
 import type { EventRow } from '../model/repo';
 import { dday, PRIORITY_NAME, priorityOf } from '../model/tasks';
 import { removeTask } from './toggleTask';
@@ -87,6 +87,7 @@ export function TaskRow({
   highlighted,
   scrollRef,
   context = 'list',
+  moveActions,
 }: {
   task: EventRow;
   today: string;
@@ -99,6 +100,8 @@ export function TaskRow({
   /** 방금 저장한 항목이면 옅은 강조색 바탕으로 잠시 표시하고 화면 안으로 스크롤한다 */
   highlighted?: boolean;
   scrollRef?: ScrollRef;
+  /** VoiceOver 순서 옮기기(끌 수 있는 목록에서) */
+  moveActions?: A11yAction[];
 }) {
   const c = useColor();
   const db = useSQLiteContext();
@@ -148,6 +151,7 @@ export function TaskRow({
         className="-mx-4"
         right={{ icon: 'check', label: done ? '완료 해제' : '완료', tone: 'task', onAction: onToggle }}
         left={{ icon: 'trash', label: '삭제', tone: 'danger', onAction: () => removeTask(db, task) }}
+        extraActions={moveActions}
       >
         <Animated.View ref={ref} className={cn('min-h-12 flex-row items-start px-4', className)} style={glowStyle}>
           {/* 체크 상자(44pt)를 누르면 완료 토글, 나머지를 누르면 편집 */}

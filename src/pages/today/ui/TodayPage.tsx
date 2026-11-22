@@ -4,12 +4,14 @@ import { useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import {
+  byTodayOrder,
   compareTasks,
   EVENT_SQL,
   type EventRow,
   matchesFilter,
   moveToToday,
   saveEvent,
+  setOrder,
   TaskList,
   toggleTask,
   useHighlight,
@@ -24,6 +26,7 @@ import {
   HabitTile,
   isMilestone,
   isScheduled,
+  setHabitOrder,
   streak,
   STREAK_LOOKBACK_DAYS,
   StreakToastIcon,
@@ -33,8 +36,22 @@ import {
   weeklyCaption,
 } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { addDays, toDateStr, useSettledOrder, useToday, weekday, WEEKDAY_KO } from '@/shared/lib';
-import { EmptyState, haptic, LargeTitle, ListGroup, ListHeader, Lozenge, showToast, Text, useColor, useTabBarInset } from '@/shared/ui';
+import { addDays, reorderIds, toDateStr, useSettledOrder, useToday, weekday, WEEKDAY_KO } from '@/shared/lib';
+import {
+  EmptyState,
+  haptic,
+  LargeTitle,
+  ListGroup,
+  ListHeader,
+  Lozenge,
+  showToast,
+  SortableItem,
+  sortActions,
+  Text,
+  useColor,
+  useSortable,
+  useTabBarInset,
+} from '@/shared/ui';
 import { QuickAddRow } from './QuickAddRow';
 import { TodayProgressCard } from './TodayProgressCard';
 
@@ -49,7 +66,9 @@ export function TodayPage() {
   const db = useSQLiteContext();
   const c = useColor();
   const today = useToday();
-  const habits = useQuery<Habit>(HABIT_SQL.activeHabits).filter((h) => isScheduled(h, today));
+  // 순서를 옮길 때 보관한 습관까지 든 전체 순서에 적용한다(습관 탭과 같은 순서)
+  const allHabits = useQuery<Habit>(HABIT_SQL.allHabits);
+  const habits = allHabits.filter((h) => !h.archived_on && isScheduled(h, today));
   // streak 계산용 최근 1년치(3-2 규칙 6)
   const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(today, -STREAK_LOOKBACK_DAYS), today]);
   const events = useQuery<EventRow>(EVENT_SQL.events);
@@ -79,11 +98,12 @@ export function TodayPage() {
 
   // 오늘 끝낸 할 일은 하루 동안 체크된 채로 목록에 남긴다. 잘못 체크해도 바로 되돌릴 수 있다
   const openOrDoneToday = (e: EventRow) => !e.completed_at || toDateStr(new Date(e.completed_at)) === today;
-  const todays = events.filter((e) => matchesFilter(e, 'today', today)).sort(compareTasks);
+  // '오늘 할 일'·'날짜 없는 할 일'은 오늘 탭에서 끌어 정한 순서(today_order). 지연은 날짜·중요도 순
+  const todays = events.filter((e) => matchesFilter(e, 'today', today)).sort(byTodayOrder);
   const overdue = events.filter((e) => !!e.start_date && (e.end_date ?? e.start_date) < today && openOrDoneToday(e)).sort(compareTasks);
   const overdueOpen = overdue.filter((e) => !e.completed_at);
   // 날짜 없는 할 일은 기한이 없으니 끝낼 때까지 대시보드에 둔다
-  const undated = events.filter((e) => matchesFilter(e, 'nodate', today) && openOrDoneToday(e)).sort(compareTasks);
+  const undated = events.filter((e) => matchesFilter(e, 'nodate', today) && openOrDoneToday(e)).sort(byTodayOrder);
   // 방금 체크한 할 일은 0.9초 제자리에 머문 뒤 아래로 간다
   const settledTodays = useSettledOrder(todays, taskId, taskDone);
   const settledOverdue = useSettledOrder(overdue, taskId, taskDone);
@@ -138,6 +158,20 @@ export function TodayPage() {
       completed: false,
       rrule: null,
     });
+  const habitSort = useSortable(
+    habits.map((h) => h.id),
+    habits.length - 1,
+    (from, to) =>
+      setHabitOrder(
+        db,
+        reorderIds(
+          allHabits.map((h) => h.id),
+          habits.map((h) => h.id),
+          from,
+          to,
+        ),
+      ),
+  );
   const edit = (id: string) => router.push({ pathname: '/habits/[id]/edit', params: { id } });
   const openEvent = (e: EventRow) => router.push({ pathname: '/event', params: { id: e.id } });
   const list = (
@@ -145,6 +179,7 @@ export function TodayPage() {
     empty: string | undefined,
     header: React.ReactNode,
     footer?: React.ReactNode,
+    reorderable?: boolean,
   ) => (
     <View className="mt-3">
       <TaskList
@@ -155,6 +190,14 @@ export function TodayPage() {
         today={today}
         onToggle={(e) => toggle(e, settled.hold)}
         onOpen={openEvent}
+        onReorder={
+          reorderable
+            ? (from, to) => {
+                const ids = settled.ordered.map((e) => e.id);
+                setOrder(db, reorderIds(ids, ids, from, to), 'today_order');
+              }
+            : undefined
+        }
         empty={empty}
         highlight={highlight}
         scrollRef={scrollRef}
@@ -229,23 +272,29 @@ export function TodayPage() {
                   {textLink('습관 추가', () => router.push('/habits/new'))}
                 </View>
               ) : (
-                // 누르면 체크, 길게 누르면 편집. 오른쪽 연속 기록 메달, 주 N회는 이번 주 진행 캡션
+                // 누르면 체크, 길게 눌러 끌면 순서 바꾸기, 길게 눌렀다 그냥 떼면 편집. 오른쪽 연속 기록 메달, 주 N회는 이번 주 진행 캡션
                 <View className="gap-2">
-                  {habits.map((h) => {
-                    const day = dayOf(h);
-                    return (
-                      <HabitTile
-                        key={h.id}
-                        name={h.name}
-                        iconKey={h.icon_key}
-                        state={habitDayState(day)}
-                        caption={day.weekly && weeklyCaption(day.weekly)}
-                        streak={{ count: streak(h, doneByHabit.get(h.id) ?? new Set<string>(), today).current, unit: streakUnit(h) }}
-                        onToggle={() => check(h)}
-                        onLongPress={() => edit(h.id)}
-                      />
-                    );
-                  })}
+                  {habitSort
+                    .arrange(habits, (h) => h.id)
+                    .map((h, i) => {
+                      const day = dayOf(h);
+                      return (
+                        <SortableItem key={h.id} sort={habitSort} id={h.id} index={i} radius={18} onHold={() => edit(h.id)}>
+                          <HabitTile
+                            name={h.name}
+                            iconKey={h.icon_key}
+                            state={habitDayState(day)}
+                            caption={day.weekly && weeklyCaption(day.weekly)}
+                            streak={{ count: streak(h, doneByHabit.get(h.id) ?? new Set<string>(), today).current, unit: streakUnit(h) }}
+                            onToggle={() => check(h)}
+                            actions={[
+                              { name: 'edit', label: '편집', onAction: () => edit(h.id) },
+                              ...sortActions(i, habits.length - 1, habitSort.drop),
+                            ]}
+                          />
+                        </SortableItem>
+                      );
+                    })}
                 </View>
               )}
             </ListGroup>
@@ -271,6 +320,7 @@ export function TodayPage() {
         undefined,
         <ListHeader inCard title="오늘 할 일" count={todays.length ? `${tasksDone}/${tasksAll}` : undefined} />,
         <QuickAddRow onAdd={quickAdd} />,
+        true,
       )}
 
       {undated.length > 0 &&
@@ -278,6 +328,8 @@ export function TodayPage() {
           settledUndated,
           undefined,
           <ListHeader inCard title="날짜 없는 할 일" count={String(undated.filter((e) => !e.completed_at).length)} />,
+          undefined,
+          true,
         )}
     </KeyboardAwareScrollView>
   );

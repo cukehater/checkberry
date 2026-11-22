@@ -10,6 +10,7 @@ export * from './PhosphorIcon';
 export * from './primitives';
 export * from './RollingNumber';
 export * from './sheet';
+export * from './sortable';
 export * from './swipe';
 export * from './theme';
 export * from './toast';

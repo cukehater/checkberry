@@ -85,7 +85,7 @@ export function useMotion(ms: number) {
 }
 
 /**
- * 탭 화면 머리. 헤더(버튼 줄 + 12pt 바닥색 띠) 바로 아래에 큰 제목(34pt, 41 줄), 오른쪽에 accessory(순서 바꾸기·이번 주·월/주 세그먼트),
+ * 탭 화면 머리. 헤더(버튼 줄 + 12pt 바닥색 띠) 바로 아래에 큰 제목(34pt, 41 줄), 오른쪽에 accessory(이번 주·월/주 세그먼트),
  * 그 아래 6pt에 메타 칩 줄(chips, 칩 사이 6), 첫 콘텐츠까지 16pt. 모든 탭이 같은 자리에 제목을 둔다
  */
 export function LargeTitle({ title, accessory, chips }: { title: string; accessory?: React.ReactNode; chips?: React.ReactNode }) {

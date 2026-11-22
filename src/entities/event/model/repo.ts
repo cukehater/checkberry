@@ -13,6 +13,8 @@ export type EventRow = {
   completed_at: string | null;
   group_id: string | null;
   sort_order: number;
+  /** 오늘 탭 순서. sort_order(할 일 탭 그룹 순서)와 따로 끌어 정한다 */
+  today_order: number;
   /** 반복 규칙. 'daily' | 'weekly' | 'monthly', 반복 안 하면 null */
   rrule: Repeat | null;
   /** 일찍 완료해서 기간을 줄였을 때 원래 시작·종료일. 아니면 null */
@@ -85,8 +87,8 @@ export async function saveEvent(
   const max = await db.getFirstAsync<{ m: number | null }>('SELECT MAX(sort_order) AS m FROM events');
   const newId = uuidv7();
   await db.runAsync(
-    `INSERT INTO events (id, title, description, start_date, end_date, priority, group_id, completed_at, rrule, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO events (id, title, description, start_date, end_date, priority, group_id, completed_at, rrule, sort_order, today_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     newId,
     e.title,
     e.description,
@@ -96,6 +98,7 @@ export async function saveEvent(
     e.group_id,
     completedAt,
     rrule,
+    (max?.m ?? -1) + 1,
     (max?.m ?? -1) + 1,
     now,
     now,
@@ -166,10 +169,10 @@ export async function restoreEvent(db: SQLiteDatabase, id: string) {
   await db.runAsync('UPDATE events SET deleted_at = NULL, updated_at = ? WHERE id = ?', nowIso(), id);
 }
 
-/** E-11 순서 변경: 그룹 안 항목을 화면에 보이는 순서대로 다시 매긴다 */
-export async function setOrder(db: SQLiteDatabase, ids: string[]) {
+/** E-11 순서 변경: 묶음 안 항목을 이 순서대로 다시 매긴다. 할 일 탭 그룹은 sort_order, 오늘 탭 묶음은 today_order */
+export async function setOrder(db: SQLiteDatabase, ids: string[], column: 'sort_order' | 'today_order' = 'sort_order') {
   await db.withTransactionAsync(async () => {
-    for (const [i, id] of ids.entries()) await db.runAsync('UPDATE events SET sort_order = ? WHERE id = ?', i, id);
+    for (const [i, id] of ids.entries()) await db.runAsync(`UPDATE events SET ${column} = ? WHERE id = ?`, i, id);
   });
 }
 

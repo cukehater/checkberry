@@ -100,6 +100,13 @@ export async function saveHabit(db: SQLiteDatabase, id: string | null, h: HabitI
   return newId;
 }
 
+/** 습관 순서(오늘 탭·습관 탭이 같이 쓴다). 이 순서대로 sort_order를 다시 매긴다 */
+export async function setHabitOrder(db: SQLiteDatabase, ids: string[]) {
+  await db.withTransactionAsync(async () => {
+    for (const [i, id] of ids.entries()) await db.runAsync('UPDATE habits SET sort_order = ? WHERE id = ?', i, id);
+  });
+}
+
 /** H-02: 보관일부터 분모에서 빠지고 과거 기록은 남는다. null이면 보관 해제 */
 export async function setHabitArchived(db: SQLiteDatabase, id: string, archivedOn: DateStr | null) {
   await db.runAsync('UPDATE habits SET archived_on = ?, updated_at = ? WHERE id = ?', archivedOn, nowIso(), id);

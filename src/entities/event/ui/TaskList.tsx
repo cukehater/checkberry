@@ -1,6 +1,6 @@
 import { View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
-import { duration, ListGroup, Separator, Text } from '@/shared/ui';
+import { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
+import { duration, ListGroup, Separator, SortableItem, sortActions, Text, useSortable } from '@/shared/ui';
 import type { EventRow } from '../model/repo';
 import { type RowContext, type ScrollRef, TaskRow } from './TaskRow';
 
@@ -15,6 +15,7 @@ export function TaskList({
   today,
   onToggle,
   onOpen,
+  onReorder,
   empty,
   highlight,
   scrollRef,
@@ -29,6 +30,8 @@ export function TaskList({
   onToggle: (e: EventRow) => void;
   /** 행을 누르면 편집. 없으면 보기·완료만 한다 */
   onOpen?: (e: EventRow) => void;
+  /** 길게 눌러 끌어 순서를 바꾼다(tasks 인덱스). 미완료 행끼리만 옮길 수 있다 */
+  onReorder?: (from: number, to: number) => void;
   empty?: string;
   highlight?: string;
   scrollRef?: ScrollRef;
@@ -42,6 +45,14 @@ export function TaskList({
   /** 날짜 줄 규칙(TaskRow). 오늘 탭·날짜 패널·'오늘' 필터는 sameDay */
   context?: RowContext;
 }) {
+  // 미완료 행은 앞에 모여 있다. 그 끝까지만 끌 수 있다
+  const firstDone = tasks.findIndex((e) => e.completed_at);
+  const max = onReorder ? (firstDone < 0 ? tasks.length : firstDone) - 1 : -1;
+  const sort = useSortable(
+    tasks.map((e) => e.id),
+    max,
+    (from, to) => onReorder?.(from, to),
+  );
   const Box = flat ? View : ListGroup;
   // 빈 카드가 남지 않게 한다
   if (tasks.length === 0 && !empty && !footer) return null;
@@ -50,22 +61,36 @@ export function TaskList({
       {header}
       {tasks.length === 0 && empty && <Text className="py-4 text-[15px] text-muted">{empty}</Text>}
       <LayoutAnimationConfig skipEntering>
-        {tasks.map((e, i) => (
-          <Animated.View key={e.id} layout={LAYOUT} entering={ENTER} exiting={EXIT}>
-            {/* 체크 상자(24) 오른쪽 글자 시작점(36)에 맞춘다 */}
-            {i > 0 && <Separator className="ml-[38px]" />}
-            <TaskRow
-              task={e}
-              today={today}
-              onToggle={() => onToggle(e)}
-              onPress={onOpen && (() => onOpen(e))}
-              highlighted={e.id === highlight}
-              scrollRef={scrollRef}
-              right={right?.(e, i)}
-              context={context}
-            />
-          </Animated.View>
-        ))}
+        {sort
+          .arrange(tasks, (e) => e.id)
+          .map((e, i) => (
+            <SortableItem
+              key={e.id}
+              sort={sort}
+              id={e.id}
+              index={i}
+              layout={sort.animateLayout ? LAYOUT : undefined}
+              entering={ENTER}
+              exiting={EXIT}
+              // 체크 상자(24) 오른쪽 글자 시작점(36)에 맞춘다. 구분선은 제자리에 두고 행만 움직인다
+              before={i > 0 && <Separator className="ml-[38px]" />}
+              // 들어 올린 행의 카드 바탕이 체크 상자 바깥까지 덮도록 좌우로 넓힌다
+              className="-mx-2 px-2"
+            >
+              <TaskRow
+                task={e}
+                today={today}
+                onToggle={() => onToggle(e)}
+                onPress={onOpen && (() => onOpen(e))}
+                highlighted={e.id === highlight}
+                scrollRef={scrollRef}
+                right={right?.(e, i)}
+                context={context}
+                // 저장 중(놓은 순서를 그리는 동안)에는 인덱스가 데이터와 달라서 주지 않는다
+                moveActions={onReorder && sort.animateLayout ? sortActions(i, max, onReorder) : undefined}
+              />
+            </SortableItem>
+          ))}
       </LayoutAnimationConfig>
       {footer}
     </Box>

@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { cn } from '@/shared/lib';
-import { CheckGlyph, duration, easing, haptic, spring, Text, useColor, usePressScale } from '@/shared/ui';
+import { type A11yAction, a11yActionProps, CheckGlyph, duration, easing, haptic, spring, Text, useColor, usePressScale } from '@/shared/ui';
 import type { StreakUnit } from '../model/stage';
 import type { HabitDayState } from '../model/today';
 import { HabitIcon } from './HabitIcon';
@@ -51,7 +51,7 @@ export function HabitTile({
   streak,
   accessory,
   onToggle,
-  onLongPress,
+  actions = [],
 }: {
   name: string;
   iconKey: string;
@@ -63,7 +63,8 @@ export function HabitTile({
   /** 배지 자리에 대신 둘 요소(습관 추가 시트 미리보기의 안내 글자) */
   accessory?: React.ReactNode;
   onToggle?: () => void;
-  onLongPress?: () => void;
+  /** VoiceOver 동작(편집, 순서 옮기기). 화면에서는 길게 눌러 끌거나 놓아서 한다(SortableItem) */
+  actions?: A11yAction[];
 }) {
   const done = state === 'done';
   const c = useColor();
@@ -113,13 +114,12 @@ export function HabitTile({
           onToggle();
         })
       }
-      onLongPress={onLongPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: state !== 'todo', disabled: !onToggle }}
       accessibilityLabel={`${name}, 오늘 ${done ? '완료' : state === 'weekDone' ? '이번 주 목표 달성' : '미완료'}${streak?.count ? `, ${streak.count}${streak.unit} 연속` : ''}${caption ? `, ${caption}` : ''}`}
-      accessibilityHint={onLongPress ? '길게 누르면 편집해요' : undefined}
+      {...a11yActionProps(actions)}
     >
       <Animated.View
         className="min-h-[58px] flex-row items-center gap-3 rounded-[18px] bg-surface-secondary px-2.5 py-2"

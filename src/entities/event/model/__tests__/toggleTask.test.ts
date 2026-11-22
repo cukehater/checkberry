@@ -28,6 +28,7 @@ const task = (over: Partial<EventRow>): EventRow => ({
   completed_at: null,
   group_id: null,
   sort_order: 0,
+  today_order: 0,
   rrule: null,
   planned_start: null,
   planned_end: null,

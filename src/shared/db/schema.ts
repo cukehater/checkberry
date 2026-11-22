@@ -84,6 +84,11 @@ const MIGRATIONS = [
   `
   UPDATE events SET priority = CASE WHEN priority < 3 THEN 1 WHEN priority > 3 THEN 5 ELSE 3 END WHERE priority NOT IN (1, 3, 5);
   `,
+  // 오늘 탭('오늘 할 일'·'날짜 없는 할 일')에서 끌어 정한 순서. 할 일 탭 그룹 순서(sort_order)와 따로 둔다
+  `
+  ALTER TABLE events ADD COLUMN today_order INTEGER NOT NULL DEFAULT 0;
+  UPDATE events SET today_order = sort_order;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

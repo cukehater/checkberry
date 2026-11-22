@@ -4,6 +4,7 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { cn } from '../lib/utils';
 import { EASE, Icon, type IconName, useMotion } from './components';
+import { type A11yAction, a11yActionProps } from './sortable';
 import { useColor } from './theme';
 
 // 행 너비의 이만큼 끌면 실행된다(넓은 화면에서도 엄지 한 번이면 되게 최대 120pt)
@@ -32,11 +33,14 @@ export function SwipeRow({
   children,
   right,
   left,
+  extraActions = [],
   className,
 }: {
   children: React.ReactNode;
   right?: Action;
   left?: Action;
+  /** 스와이프 말고 VoiceOver로만 하는 동작(순서 옮기기) */
+  extraActions?: A11yAction[];
   className?: string;
 }) {
   const c = useColor();
@@ -83,13 +87,15 @@ export function SwipeRow({
   // 면 위 아이콘색. 다크의 포인트·할 일 면은 밝아서 어두운 글자색을 쓴다
   const toneInk = (t: Action['tone']) => (t === 'task' ? c.onTask : t === 'accent' ? c.onAccent : c.onDanger);
 
-  const actions = [right, left].filter((a): a is Action => !!a);
+  const actions = [
+    ...[right, left].filter((a): a is Action => !!a).map((a) => ({ name: a.label, label: a.label, onAction: a.onAction })),
+    ...extraActions,
+  ];
   return (
     <View
       className={cn('overflow-hidden', className)}
       onLayout={(e) => width.set(e.nativeEvent.layout.width)}
-      accessibilityActions={actions.map((a) => ({ name: a.label, label: a.label }))}
-      onAccessibilityAction={(e) => actions.find((a) => a.label === e.nativeEvent.actionName)?.onAction()}
+      {...a11yActionProps(actions)}
     >
       {right && (
         // 동작 색 면은 끄는 쪽에 따라 하나만 보인다. 색은 동작마다 계산되는 값이라 style로 준다.

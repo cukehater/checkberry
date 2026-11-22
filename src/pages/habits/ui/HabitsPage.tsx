@@ -19,6 +19,7 @@ import {
   HabitChip,
   type HabitLog,
   isScheduled,
+  setHabitOrder,
   streak,
   StreakArt,
   STREAK_LOOKBACK_DAYS,
@@ -28,21 +29,25 @@ import {
   weeklyCaption,
 } from '@/entities/habit';
 import { useQuery } from '@/shared/db';
-import { addDays, cn, formatKo, formatMD, useToday, WEEKDAY_KO, weekOfMonthLabel, weekStart } from '@/shared/lib';
+import { addDays, cn, formatKo, formatMD, reorderIds, useToday, WEEKDAY_KO, weekOfMonthLabel, weekStart } from '@/shared/lib';
 import {
   duration,
   easing,
   EmptyState,
   haptic,
   Icon,
+  a11yActionProps,
   LargeTitle,
   ListGroup,
   Lozenge,
   PeriodNav,
   RollingNumber,
+  SortableItem,
+  sortActions,
   spring,
   Text,
   useColor,
+  useSortable,
   useTabBarInset,
 } from '@/shared/ui';
 
@@ -64,6 +69,21 @@ export function HabitsPage() {
   const allHabits = useQuery<Habit>(HABIT_SQL.allHabits);
   // 보관한 습관은 예정일이 없어도 남겨 둔다(편집 시트에서 보관 해제하는 길)
   const habits = allHabits.filter((h) => days.some((d) => isScheduled(h, d)) || (!!h.archived_on && h.start_date <= days[6]));
+  // 길게 눌러 끌어 순서 바꾸기. 이번 주에 안 보이는 습관까지 든 전체 순서에 적용한다(오늘 탭과 같은 순서)
+  const sort = useSortable(
+    habits.map((h) => h.id),
+    habits.length - 1,
+    (from, to) =>
+      setHabitOrder(
+        db,
+        reorderIds(
+          allHabits.map((h) => h.id),
+          habits.map((h) => h.id),
+          from,
+          to,
+        ),
+      ),
+  );
   // 지난주와 견주려고 한 주 앞까지 읽는다
   const logs = useQuery<HabitLog>(HABIT_SQL.logsBetween, [addDays(start, -7), days[6]]);
   // 연속 기록은 보고 있는 주와 상관없이 오늘 기준. 전체 기록 대신 오늘 탭과 같은 기간만 읽는다
@@ -191,85 +211,96 @@ export function HabitsPage() {
               );
             })}
           </View>
-          {habits.map((h) => {
-            const doneCount = days.filter((d) => isDone(h.id, d)).length;
-            const target = h.weekly_target ?? 1;
-            const weekly = h.frequency_type === 'weekly';
-            const current = streak(h, datesOf(h.id), today).current;
-            return (
-              <View key={h.id} className={cn('gap-1 border-t border-separator pt-2.5 pb-1.5', h.archived_on && 'opacity-50')}>
-                <Pressable
-                  className="min-h-11 flex-row items-center gap-2.5 px-1 active:opacity-60"
-                  onPress={() => router.push({ pathname: '/habits/[id]/edit', params: { id: h.id } })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${h.name} 편집`}
+          {sort
+            .arrange(habits, (h) => h.id)
+            .map((h, i) => {
+              const doneCount = days.filter((d) => isDone(h.id, d)).length;
+              const target = h.weekly_target ?? 1;
+              const weekly = h.frequency_type === 'weekly';
+              const current = streak(h, datesOf(h.id), today).current;
+              return (
+                <SortableItem
+                  key={h.id}
+                  sort={sort}
+                  id={h.id}
+                  index={i}
+                  // 구분선은 제자리에 두고 습관 블록만 움직인다. 들어 올린 블록의 카드 바탕이 카드 안쪽 여백까지 덮게 좌우로 넓힌다
+                  before={<View className="border-t border-separator" />}
+                  className={cn('-mx-1.5 gap-1 px-1.5 pt-2.5 pb-1.5', h.archived_on && 'opacity-50')}
                 >
-                  <HabitChip iconKey={h.icon_key} size={32} />
-                  <View className="flex-1">
-                    <Text className="text-[16px] leading-[22px] font-medium" numberOfLines={1}>
-                      {h.name}
-                    </Text>
-                    {/* 주 N회는 점 대신 '이번 주 3/3 완료' */}
-                    {weekly && (
-                      <Text className="text-[13px] leading-[18px] font-medium text-muted">
-                        {weeklyCaption({ done: doneCount, target })}
+                  <Pressable
+                    className="min-h-11 flex-row items-center gap-2.5 px-1 active:opacity-60"
+                    onPress={() => router.push({ pathname: '/habits/[id]/edit', params: { id: h.id } })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${h.name} 편집`}
+                    {...a11yActionProps(sortActions(i, habits.length - 1, sort.drop))}
+                  >
+                    <HabitChip iconKey={h.icon_key} size={32} />
+                    <View className="flex-1">
+                      <Text className="text-[16px] leading-[22px] font-medium" numberOfLines={1}>
+                        {h.name}
                       </Text>
-                    )}
+                      {/* 주 N회는 점 대신 '이번 주 3/3 완료' */}
+                      {weekly && (
+                        <Text className="text-[13px] leading-[18px] font-medium text-muted">
+                          {weeklyCaption({ done: doneCount, target })}
+                        </Text>
+                      )}
+                    </View>
+                    {h.archived_on && <Lozenge label="보관" />}
+                    {/* 흰 카드 위라 메달 원 바탕은 card */}
+                    <StreakBadge count={current} unit={streakUnit(h)} surface="card" />
+                  </Pressable>
+                  <View className="flex-row gap-1">
+                    {days.map((d) => {
+                      const on = isDone(h.id, d);
+                      const scheduled = isScheduled(h, d);
+                      const future = d > today;
+                      const isToday = d === today;
+                      return (
+                        <Cell
+                          key={d}
+                          disabled={!scheduled || future}
+                          onPress={() => {
+                            setPressed(`${h.id}|${d}`);
+                            if (on) haptic.uncheck();
+                            else haptic.checkStrong();
+                            toggleHabitLog(db, h.id, d);
+                          }}
+                          className={cn('h-11 flex-1 items-center justify-center rounded-[14px]', isToday && 'bg-accent-soft')}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: on, disabled: !scheduled || future }}
+                          accessibilityLabel={`${h.name} ${formatKo(d)}`}
+                        >
+                          {on ? (
+                            // 누른 칸만 160ms 동안 베리로 찬다(화면을 처음 열 때는 연출하지 않는다)
+                            <Animated.View
+                              key="on"
+                              entering={pressed === `${h.id}|${d}` ? FILL : undefined}
+                              className="h-[30px] w-[30px] items-center justify-center rounded-full bg-accent"
+                            >
+                              <Icon name="check" size={16} tint={c.onAccent} />
+                            </Animated.View>
+                          ) : scheduled ? (
+                            // 할 날인데 안 한 칸: 빈 원. 오늘은 베리 테두리
+                            <View
+                              key="off"
+                              className={cn(
+                                'h-[30px] w-[30px] rounded-full',
+                                isToday ? 'border-2 border-accent' : 'border-[1.75px] border-track',
+                              )}
+                            />
+                          ) : (
+                            // 예정 아닌 날: 작은 점
+                            <View key="rest" className="h-[5px] w-[5px] rounded-full bg-track" />
+                          )}
+                        </Cell>
+                      );
+                    })}
                   </View>
-                  {h.archived_on && <Lozenge label="보관" />}
-                  {/* 흰 카드 위라 메달 원 바탕은 card */}
-                  <StreakBadge count={current} unit={streakUnit(h)} surface="card" />
-                </Pressable>
-                <View className="flex-row gap-1">
-                  {days.map((d) => {
-                    const on = isDone(h.id, d);
-                    const scheduled = isScheduled(h, d);
-                    const future = d > today;
-                    const isToday = d === today;
-                    return (
-                      <Cell
-                        key={d}
-                        disabled={!scheduled || future}
-                        onPress={() => {
-                          setPressed(`${h.id}|${d}`);
-                          if (on) haptic.uncheck();
-                          else haptic.checkStrong();
-                          toggleHabitLog(db, h.id, d);
-                        }}
-                        className={cn('h-11 flex-1 items-center justify-center rounded-[14px]', isToday && 'bg-accent-soft')}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: on, disabled: !scheduled || future }}
-                        accessibilityLabel={`${h.name} ${formatKo(d)}`}
-                      >
-                        {on ? (
-                          // 누른 칸만 160ms 동안 베리로 찬다(화면을 처음 열 때는 연출하지 않는다)
-                          <Animated.View
-                            key="on"
-                            entering={pressed === `${h.id}|${d}` ? FILL : undefined}
-                            className="h-[30px] w-[30px] items-center justify-center rounded-full bg-accent"
-                          >
-                            <Icon name="check" size={16} tint={c.onAccent} />
-                          </Animated.View>
-                        ) : scheduled ? (
-                          // 할 날인데 안 한 칸: 빈 원. 오늘은 베리 테두리
-                          <View
-                            key="off"
-                            className={cn(
-                              'h-[30px] w-[30px] rounded-full',
-                              isToday ? 'border-2 border-accent' : 'border-[1.75px] border-track',
-                            )}
-                          />
-                        ) : (
-                          // 예정 아닌 날: 작은 점
-                          <View key="rest" className="h-[5px] w-[5px] rounded-full bg-track" />
-                        )}
-                      </Cell>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
+                </SortableItem>
+              );
+            })}
         </ListGroup>
       )}
     </ScrollView>
