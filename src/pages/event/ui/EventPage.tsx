@@ -137,7 +137,6 @@ export function EventPage() {
     if (!ev) return;
     confirm({
       title: `${eulReul(ev.title)} 삭제할까요?`,
-      message: '목록에서 지워져요.',
       confirmLabel: '삭제',
       destructive: true,
     }).then(async (ok) => {

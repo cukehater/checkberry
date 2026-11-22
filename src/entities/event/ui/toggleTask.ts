@@ -19,7 +19,6 @@ export async function toggleTask(db: SQLiteDatabase, ev: EventRow, today: DateSt
 export async function removeTask(db: SQLiteDatabase, ev: EventRow) {
   const ok = await confirm({
     title: `${eulReul(ev.title)} 삭제할까요?`,
-    message: '목록에서 지워져요.',
     confirmLabel: '삭제',
     destructive: true,
   });
